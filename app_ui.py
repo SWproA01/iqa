@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QPushButton, QLabel, QStackedWidget, QFrame,
                              QMessageBox, QTableWidget, QTableWidgetItem, 
                              QHeaderView, QHBoxLayout, QStyle, QSlider, QGridLayout,
-                             QCheckBox)
+                             QCheckBox, QSizePolicy)
 from PyQt5.QtCore import Qt, QSize
 from PyQt5.QtGui import QFont, QIcon, QPixmap, QColor, QPalette
 
@@ -84,10 +84,10 @@ class StartPage(QWidget):
         )
         btn_iqa = self.create_function_button(
             controller,
-            index=3, # 새로운 페이지 인덱스 (3번)
+            index=3,
             icon=QApplication.style().standardIcon(QStyle.SP_ComputerIcon),
-            title="이미지 품질 검사 (IQA)",
-            description="AI(CLIP/BRISQUE)를 이용해 사진의 미적/기술적 품질 점수를 측정합니다."
+            title="베스트 이미지 추천",
+            description="AI를 이용해 최고의 사진을 찾아줍니다."
         )
         button_layout.addStretch(1)
         button_layout.addWidget(btn_dup, 2)
@@ -477,9 +477,11 @@ class SimilarImageScanPage(QWidget):
         self.preview_label_top = QLabel("파일 1을 드롭하세요")
         self.preview_label_top.setAlignment(Qt.AlignCenter)
         self.preview_label_top.setObjectName("ImagePreview")
+        self.preview_label_top.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
         self.preview_label_bottom = QLabel("파일 2를 드롭하세요")
         self.preview_label_bottom.setAlignment(Qt.AlignCenter)
         self.preview_label_bottom.setObjectName("ImagePreview")
+        self.preview_label_bottom.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
         preview_layout.addWidget(self.preview_label_top, 1)
         preview_layout.addWidget(self.preview_label_bottom, 1)
         self.single_panel_preview_widget = QWidget()
@@ -488,6 +490,7 @@ class SimilarImageScanPage(QWidget):
         self.single_preview_label = QLabel("테이블에서 이미지를 클릭하세요.")
         self.single_preview_label.setAlignment(Qt.AlignCenter)
         self.single_preview_label.setObjectName("ImagePreview")
+        self.single_preview_label.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
         single_preview_layout.addWidget(self.single_preview_label, 1)
         self.preview_stack = QStackedWidget()
         self.preview_stack.addWidget(self.two_panel_preview_widget)
@@ -671,8 +674,6 @@ class SimilarImageScanPage(QWidget):
                 self.result_table.setItem(row_position, 0, path_item)
                 self.result_table.setItem(row_position, 1, score_item)
 
-# app_ui.py 파일 끝 부분 (MainWindow 클래스 정의 위에)에 다음 클래스를 통째로 추가해야 합니다.
-
 class ImageQualityPage(QWidget):
     def __init__(self, controller):
         super().__init__()
@@ -692,57 +693,67 @@ class ImageQualityPage(QWidget):
         
         self.result_table = QTableWidget()
         self.result_table.setObjectName("ResultTable")
-        self.result_table.setColumnCount(6)
+        # [수정] 체크박스를 위한 열 1개 추가 (총 7개 열)
+        self.result_table.setColumnCount(7) 
         
         # 테이블 헤더 정의
         self.result_table.setHorizontalHeaderLabels([
-            "파일 경로", "종합 점수", "미적 점수", "기술 점수", "선명도(Lap)", "화질(Brisque)"
+            "선택", "파일 경로", "종합 점수", "미적 점수", "기술 점수", "선명도", "화질"
         ])
 
-        self.result_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
-        for i in range(1, 6):
+        # '선택' 열 너비 고정
+        self.result_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)
+        self.result_table.setColumnWidth(0, 50)
+        
+        # 나머지 열 설정
+        self.result_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch) # 파일 경로
+        for i in range(2, 7):
             self.result_table.horizontalHeader().setSectionResizeMode(i, QHeaderView.ResizeToContents)
 
         self.result_table.verticalHeader().setVisible(False)
         self.result_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.result_table.setAlternatingRowColors(True)
         
+        # [추가] 테이블 셀 클릭 이벤트 연결
+        self.result_table.cellClicked.connect(self.show_image_on_click)
+
         left_layout.addWidget(self.info_label, 1)
         left_layout.addWidget(self.result_table, 3)
         
-        # 2. 오른쪽: 통계 및 제어 버튼
+        # 2. 오른쪽: Best Shot 미리보기와 통계/제어 버튼
         right_layout = QVBoxLayout()
-        self.stats_label = QLabel("검사할 이미지 파일을 포함한 폴더를 드롭하세요.")
-        self.stats_label.setStyleSheet("padding: 10px; background-color: #3A3A3A; border-radius: 4px; min-height: 120px;")
         
-        # Matplotlib 캔버스 (MATPLOTLIB_AVAILABLE 여부는 파일 상단에서 정의됨)
-        # 이 부분은 사용자 환경에 따라 달라지므로, MplCanvas 정의가 app_ui.py에 있어야 합니다.
-        try:
-             # 임시로 Matplotlib 캔버스 객체를 만듭니다. (실제 사용 여부는 MATPLOTLIB_AVAILABLE 변수에 따름)
-             from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-             from matplotlib.figure import Figure
-             class MplCanvas(FigureCanvas): # MplCanvas 클래스가 app_ui.py 파일 상단에 정의되어 있다고 가정합니다.
-                def __init__(self, parent=None, width=5, height=4, dpi=100):
-                   self.fig = Figure(figsize=(width, height), dpi=dpi)
-                   self.axes = self.fig.add_subplot(111)
-                   self.fig.patch.set_facecolor('#3A3A3A')
-                   super(MplCanvas, self).__init__(self.fig)
-                   self.setParent(parent)
-
-             self.canvas = MplCanvas(self, width=5, height=4, dpi=100) if MATPLOTLIB_AVAILABLE else None
-        except ImportError:
-            self.canvas = None
-            
-        if self.canvas:
-            right_layout.addWidget(self.stats_label, 1)
-            right_layout.addWidget(self.canvas, 3)
-        else:
-            right_layout.addWidget(self.stats_label, 1)
+        # Best Shot 미리보기 패널 (ImagePreview)
+        self.best_shot_image = QLabel("검사할 이미지 파일을 포함한 폴더를 드롭하세요.")
+        self.best_shot_image.setStyleSheet("padding: 10px; background-color: #3A3A3A; border-radius: 4px; min-height: 200px;")
+        self.best_shot_image.setAlignment(Qt.AlignCenter)
+        self.best_shot_image.setObjectName("ImagePreview")
+        self.best_shot_image.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
+        
+        # 1위 이미지 통계 텍스트 전용 패널
+        self.best_shot_stats = QLabel("")
+        self.best_shot_stats.setStyleSheet("padding: 10px; background-color: #2E2E2E; border-radius: 4px; max-height: 150px;")
+        self.best_shot_stats.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+        self.best_shot_stats.setWordWrap(True)
+        
+        self.canvas = None # Matplotlib 캔버스 제거
+        
+        right_layout.addWidget(self.best_shot_image, 1) # 미리보기/통계 패널
+        right_layout.addWidget(self.best_shot_stats, 0) # 통계 텍스트
+        
+        # 선택한 파일 삭제 버튼
+        self.batch_delete_btn = QPushButton("선택한 파일 삭제")
+        self.batch_delete_btn.setIcon(QApplication.style().standardIcon(QStyle.SP_TrashIcon))
+        self.batch_delete_btn.setStyleSheet("background-color: #7A3A3A;")
+        self.batch_delete_btn.clicked.connect(self.handle_batch_delete)
+        right_layout.addWidget(self.batch_delete_btn)
 
         button_layout = QHBoxLayout()
         reset_btn = QPushButton("다시 하기")
+        reset_btn.setIcon(QApplication.style().standardIcon(QStyle.SP_BrowserReload))
         reset_btn.clicked.connect(self.reset_page)
         back_btn = QPushButton("뒤로 가기")
+        back_btn.setIcon(QApplication.style().standardIcon(QStyle.SP_ArrowBack))
         back_btn.clicked.connect(lambda: self.controller.setCurrentIndex(0))
         
         button_layout.addStretch(1)
@@ -758,10 +769,9 @@ class ImageQualityPage(QWidget):
         self.info_label.setText("\n\n이미지 품질을 검사할 폴더를\n이곳으로 드래그 앤 드롭하세요.\n\n")
         self.info_label.setStyleSheet("")
         self.result_table.setRowCount(0)
-        self.stats_label.setText("검사할 이미지 파일을 포함한 폴더를 드롭하세요.")
-        if MATPLOTLIB_AVAILABLE and self.canvas:
-             self.canvas.axes.clear()
-             self.canvas.draw()
+        self.best_shot_image.setText("검사할 이미지 파일을 포함한 폴더를 드롭하세요.") 
+        self.best_shot_image.clear() 
+        self.best_shot_stats.setText("")
 
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
@@ -779,7 +789,6 @@ class ImageQualityPage(QWidget):
             self.info_label.setText(f"'{os.path.basename(folder_path)}' 폴더 내 이미지 품질 분석 중... (시간 소요)")
             QApplication.processEvents()
             
-            # --- 핵심 로직 호출 (app_logic 필요) ---
             results, iqa_active = app_logic.analyze_image_quality_in_folder(folder_path)
             
             if not iqa_active:
@@ -795,6 +804,126 @@ class ImageQualityPage(QWidget):
         else:
             self.info_label.setText("⚠️ 폴더가 아닙니다. 폴더를 드래그 앤 드롭해주세요.")
 
+    def handle_batch_delete(self):
+        files_to_delete = []
+        for row in range(self.result_table.rowCount()):
+            cell_widget = self.result_table.cellWidget(row, 0)
+            if cell_widget:
+                chk_box = cell_widget.findChild(QCheckBox)
+                if chk_box and chk_box.isChecked():
+                    files_to_delete.append({
+                        "row": row,
+                        "path": chk_box.property("file_path"),
+                        "size": chk_box.property("file_size")
+                    })
+
+        if not files_to_delete:
+            QMessageBox.information(self, "선택 없음", "삭제할 파일을 하나 이상 선택하세요.")
+            return
+
+        total_size_to_delete = sum(item['size'] for item in files_to_delete) 
+
+        reply = QMessageBox.question(self, '일괄 삭제 확인',
+                                     f"정말로 <b>{len(files_to_delete)}개</b>의 파일을 영구적으로 삭제하시겠습니까?<br><br>"
+                                     f"<b><font color='#FF6347'>총 확보 용량: {app_logic.format_bytes(total_size_to_delete)}</font></b><br><br>"
+                                     f"이 작업은 되돌릴 수 없습니다.",
+                                     QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if reply == QMessageBox.No:
+            return
+
+        deleted_count = 0
+        space_saved = 0
+        
+        for item in sorted(files_to_delete, key=lambda x: x['row'], reverse=True):
+            try:
+                os.remove(item['path'])
+                self.result_table.removeRow(item['row'])
+                deleted_count += 1
+                space_saved += item['size'] 
+            except Exception as e:
+                print(f"파일 삭제 오류 ({item['path']}): {e}")
+
+        if deleted_count > 0:
+            QMessageBox.information(self, "삭제 완료",
+                                    f"총 {deleted_count}개의 파일을 삭제했습니다.\n"
+                                    f"확보된 용량: {app_logic.format_bytes(space_saved)}")
+        else:
+            QMessageBox.warning(self, "삭제 실패", "파일을 삭제하는 중 오류가 발생했습니다.")
+
+    def display_best_shot_preview(self, file_path):
+        """지정된 파일 경로의 이미지를 미리보기 패널에 표시합니다."""
+        label = self.best_shot_image
+        if os.path.exists(file_path):
+            try:
+                pixmap = QPixmap()
+                with open(file_path, 'rb') as f:
+                    img_bytes = f.read()
+                pixmap.loadFromData(img_bytes)
+                
+                label.setPixmap(pixmap.scaled(label.size(), 
+                                              Qt.KeepAspectRatio, 
+                                              Qt.SmoothTransformation))
+                label.setText("") 
+                
+            except Exception as e:
+                label.setText(f"미리보기 오류:\n{os.path.basename(file_path)}\n{e}")
+        else:
+            label.setText("파일을 찾을 수 없습니다.")
+
+    # [추가] 통계 텍스트 업데이트 함수 (클릭 이벤트 처리 시 사용)
+    def update_stats_panel(self, data):
+        """주어진 이미지 데이터로 통계 텍스트 패널을 업데이트합니다."""
+        if not data:
+            self.best_shot_stats.setText("")
+            return
+
+        best_score = data['score_data']['final_score']
+        best_tech = data['score_data']['technical']
+        best_aes = data['score_data']['aesthetic']
+        best_lap = data['score_data']['raw_metrics']['raw_laplacian']
+        
+        info_text = (
+            f"<b>🥇 파일: {os.path.basename(data['path'])}</b><br>"
+            f"<span style='font-size: 16pt; color: #FFD700;'>{best_score:.2f}</span> / 100<br>"
+            f"<hr style='border: 1px solid #444; margin-top: 5px; margin-bottom: 5px;'>"
+            f"미적 점수: {best_aes:.2f}<br>"
+            f"기술 점수: {best_tech:.2f}<br>"
+            f"<small>(Laplacian: {best_lap:.0f})</small>"
+        )
+        self.best_shot_stats.setText(info_text)
+
+    # [수정] Top 3 클릭 시 미리보기와 텍스트를 연동하는 함수
+    def show_image_on_click(self, row, column):
+        """테이블 클릭 시 Top 3 항목의 이미지를 미리보기 패널에 표시하고 통계 텍스트를 업데이트합니다."""
+        
+        item = self.result_table.item(row, 1) # 1열은 파일 경로 아이템
+        
+        if not item: return
+
+        # Qt.UserRole에 저장된 순위와 Qt.UserRole + 1에 저장된 전체 데이터를 가져옵니다.
+        rank = item.data(Qt.UserRole)
+        full_data = item.data(Qt.UserRole + 1) # 전체 데이터 딕셔너리
+        file_path = item.text()
+
+        # Top 3 항목인지 확인하고, 데이터가 있는지 확인
+        if rank is not None and rank in (1, 2, 3) and full_data:
+            self.display_best_shot_preview(file_path) # 미리보기 이미지 업데이트
+            self.update_stats_panel(full_data)       # 통계 텍스트 업데이트
+        elif item.data(Qt.UserRole) is None:
+            # 4위 이하를 클릭했을 경우, 1위 데이터로 초기화 (선택 사항)
+            pass
+            
+
+    def resizeEvent(self, event):
+        """QLabel 크기 변경 시 이미지도 다시 조정"""
+        super().resizeEvent(event)
+        if self.best_shot_image.pixmap() and not self.best_shot_image.text():
+            pixmap = self.best_shot_image.pixmap()
+            self.best_shot_image.setPixmap(pixmap.scaled(self.best_shot_image.size(), 
+                                                           Qt.KeepAspectRatio, 
+                                                           Qt.SmoothTransformation))
+
+    # [수정] populate_table 함수 (체크박스 및 Top 3 데이터 저장 로직 수정)
     def populate_table(self, results):
         self.result_table.setRowCount(0)
         
@@ -802,41 +931,67 @@ class ImageQualityPage(QWidget):
             row_position = self.result_table.rowCount()
             self.result_table.insertRow(row_position)
             
-            # 파일 경로
+            # 파일 경로 및 크기 (삭제 로직 사용을 위해 필요)
             path_item = QTableWidgetItem(data['path'])
+            file_size = data.get('size', 0) 
             
-            # 최종 점수
+            # 점수 항목들
             final_score_item = QTableWidgetItem(f"{data['score_data']['final_score']:.2f}")
-            
-            # 미적/기술 점수 (breakdown)
             aes_item = QTableWidgetItem(f"{data['score_data']['aesthetic']:.2f}")
             tech_item = QTableWidgetItem(f"{data['score_data']['technical']:.2f}")
-            
-            # 원본 지표
             lap_item = QTableWidgetItem(f"{data['score_data']['raw_metrics']['raw_laplacian']:.0f}")
             brisque_item = QTableWidgetItem(f"{data['score_data']['raw_metrics']['raw_brisque']:.0f}")
 
-            # 1위 강조
-            if rank == 0:
-                 path_item.setForeground(QColor("#FFD700"))
-                 final_score_item.setForeground(QColor("#FFD700"))
+            # 체크박스 위젯 생성 및 정보 저장
+            checkbox_widget = QWidget()
+            chk_layout = QHBoxLayout(checkbox_widget)
+            chk_box = QCheckBox()
+            chk_layout.addWidget(chk_box)
+            chk_layout.setAlignment(Qt.AlignCenter)
+            chk_layout.setContentsMargins(0,0,0,0)
+            checkbox_widget.setLayout(chk_layout)
+            
+            chk_box.setProperty("file_path", data['path'])
+            chk_box.setProperty("file_size", file_size) 
+            chk_box.setProperty("table_row", row_position)
+            
+            # 1~3위 강조 및 데이터 저장
+            current_rank = rank + 1
+            if current_rank <= 3:
+                 # [추가] 경로 아이템에 순위 정보 저장
+                 path_item.setData(Qt.UserRole, current_rank) 
+                 # [추가] 경로 아이템에 전체 데이터 저장 (클릭 이벤트 처리 시 사용)
+                 path_item.setData(Qt.UserRole + 1, data) 
+                 
+                 # 금/은/동 색상 지정
+                 color = QColor("#FFD700") if current_rank == 1 else (QColor("#C0C0C0") if current_rank == 2 else QColor("#CD7F32"))
+                 
+                 path_item.setForeground(color)
+                 final_score_item.setForeground(color)
                  final_score_item.setFont(QFont("Segoe UI", 9, QFont.Bold))
-                 for col in range(6):
-                    cell = self.result_table.item(row_position, col)
-                    if cell: cell.setBackground(QColor("#444430"))
+                 
+            self.result_table.setCellWidget(row_position, 0, checkbox_widget)
+            self.result_table.setItem(row_position, 1, path_item)
+            self.result_table.setItem(row_position, 2, final_score_item)
+            self.result_table.setItem(row_position, 3, aes_item)
+            self.result_table.setItem(row_position, 4, tech_item)
+            self.result_table.setItem(row_position, 5, lap_item)
+            self.result_table.setItem(row_position, 6, brisque_item)
             
-            self.result_table.setItem(row_position, 0, path_item)
-            self.result_table.setItem(row_position, 1, final_score_item)
-            self.result_table.setItem(row_position, 2, aes_item)
-            self.result_table.setItem(row_position, 3, tech_item)
-            self.result_table.setItem(row_position, 4, lap_item)
-            self.result_table.setItem(row_position, 5, brisque_item)
-            
-            for i in range(1, 6):
+            for i in range(2, 7): 
                  item = self.result_table.item(row_position, i)
                  item.setTextAlignment(Qt.AlignCenter)
+                 if current_rank == 1:
+                     item.setBackground(QColor("#444430")) # 1위 배경색 강조
+        
+        # --- 1위 이미지 초기 표시 및 통계 텍스트 표시 ---
+        if results:
+             best_shot_path = results[0]['path']
+             self.display_best_shot_preview(best_shot_path) # 1위 이미지 초기 표시
+             self.update_stats_panel(results[0]) # 1위 통계 정보 초기 표시
+        else:
+             self.best_shot_stats.setText("")
 
-# --- 메인 윈도우 (UI 클래스) (변경 없음) ---
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -853,7 +1008,6 @@ class MainWindow(QMainWindow):
         self.stacked_widget.addWidget(self.similar_image_page)
         self.stacked_widget.addWidget(self.iqa_page)
 
-# --- 애플리케이션 실행 (변경 없음) ---
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     
