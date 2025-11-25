@@ -894,24 +894,20 @@ class ImageQualityPage(QWidget):
 
     # [수정] Top 3 클릭 시 미리보기와 텍스트를 연동하는 함수
     def show_image_on_click(self, row, column):
-        """테이블 클릭 시 Top 3 항목의 이미지를 미리보기 패널에 표시하고 통계 텍스트를 업데이트합니다."""
+        """테이블 클릭 시 선택한 이미지를 미리보기 패널에 표시하고 통계 텍스트를 업데이트합니다."""
         
         item = self.result_table.item(row, 1) # 1열은 파일 경로 아이템
         
         if not item: return
 
-        # Qt.UserRole에 저장된 순위와 Qt.UserRole + 1에 저장된 전체 데이터를 가져옵니다.
-        rank = item.data(Qt.UserRole)
-        full_data = item.data(Qt.UserRole + 1) # 전체 데이터 딕셔너리
+        # 저장해둔 전체 데이터 가져오기
+        full_data = item.data(Qt.UserRole + 1) 
         file_path = item.text()
 
-        # Top 3 항목인지 확인하고, 데이터가 있는지 확인
-        if rank is not None and rank in (1, 2, 3) and full_data:
+        # 데이터가 있다면 순위 상관없이 표시
+        if full_data:
             self.display_best_shot_preview(file_path) # 미리보기 이미지 업데이트
-            self.update_stats_panel(full_data)       # 통계 텍스트 업데이트
-        elif item.data(Qt.UserRole) is None:
-            # 4위 이하를 클릭했을 경우, 1위 데이터로 초기화 (선택 사항)
-            pass
+            self.update_stats_panel(full_data)
             
 
     def resizeEvent(self, event):
@@ -957,19 +953,19 @@ class ImageQualityPage(QWidget):
             
             # 1~3위 강조 및 데이터 저장
             current_rank = rank + 1
+            
+            # 1. 모든 행에 데이터 저장 (그래야 클릭 시 정보를 가져올 수 있음)
+            path_item.setData(Qt.UserRole, current_rank) 
+            path_item.setData(Qt.UserRole + 1, data) 
+
+            # 2. 1~3위만 색상 강조 (기능 제한은 풀고, 스타일만 유지)
             if current_rank <= 3:
-                 # [추가] 경로 아이템에 순위 정보 저장
-                 path_item.setData(Qt.UserRole, current_rank) 
-                 # [추가] 경로 아이템에 전체 데이터 저장 (클릭 이벤트 처리 시 사용)
-                 path_item.setData(Qt.UserRole + 1, data) 
-                 
-                 # 금/은/동 색상 지정
                  color = QColor("#FFD700") if current_rank == 1 else (QColor("#C0C0C0") if current_rank == 2 else QColor("#CD7F32"))
-                 
                  path_item.setForeground(color)
                  final_score_item.setForeground(color)
                  final_score_item.setFont(QFont("Segoe UI", 9, QFont.Bold))
-                 
+            # --- [수정된 부분 끝] ---
+
             self.result_table.setCellWidget(row_position, 0, checkbox_widget)
             self.result_table.setItem(row_position, 1, path_item)
             self.result_table.setItem(row_position, 2, final_score_item)
@@ -982,13 +978,12 @@ class ImageQualityPage(QWidget):
                  item = self.result_table.item(row_position, i)
                  item.setTextAlignment(Qt.AlignCenter)
                  if current_rank == 1:
-                     item.setBackground(QColor("#444430")) # 1위 배경색 강조
+                     item.setBackground(QColor("#444430"))
         
-        # --- 1위 이미지 초기 표시 및 통계 텍스트 표시 ---
         if results:
              best_shot_path = results[0]['path']
-             self.display_best_shot_preview(best_shot_path) # 1위 이미지 초기 표시
-             self.update_stats_panel(results[0]) # 1위 통계 정보 초기 표시
+             self.display_best_shot_preview(best_shot_path)
+             self.update_stats_panel(results[0])
         else:
              self.best_shot_stats.setText("")
 

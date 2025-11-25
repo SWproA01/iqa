@@ -25,7 +25,7 @@ class HybridScorer:
         self.W_T_BRISQUE = 0.4       # BRISQUE 중요도 (일반적 품질)
         
         # 3. 정규화 및 밝기 기준
-        self.LAPLACIAN_MAX = 1500.0  # Laplacian 정규화 기준
+        self.LAPLACIAN_MAX = 1000.0  # Laplacian 정규화 기준
         self.BRIGHT_LOWER = 30.0
         self.BRIGHT_UPPER = 220.0
         
@@ -48,23 +48,24 @@ class HybridScorer:
         if img_cv is None:
             raise FileNotFoundError("OpenCV 디코딩 실패. 이미지 경로를 확인하거나 파일이 손상되지 않았는지 확인하세요.")
 
-        # Laplacian (선명도) 및 Brightness 계산
-        gray = cv2.cvtColor(img_cv, cv2.COLOR_BGR2GRAY)
+        target_width = 640
+        h, w, _ = img_cv.shape
+        scale = target_width / w
+        new_h = int(h * scale)
+        img_resized = cv2.resize(img_cv, (target_width, new_h), interpolation=cv2.INTER_AREA)
+
+        gray = cv2.cvtColor(img_resized, cv2.COLOR_BGR2GRAY)
         blur_score = cv2.Laplacian(gray, cv2.CV_64F).var() 
         brightness = np.mean(gray)
         
-        # BRISQUE 계산을 위한 전처리 (OpenCV BGR -> Pytorch RGB, 0-1 Normalization)
         img_rgb = cv2.cvtColor(img_cv, cv2.COLOR_BGR2RGB)
-        # HWC -> CWH 변환 (piq는 NCHW 포맷 요구)
         img_tensor = torch.tensor(img_rgb, dtype=torch.float32).permute(2, 0, 1).unsqueeze(0) / 255.0
         img_tensor = img_tensor.to(self.device)
         
         brisque_val = 0.0
         try:
-            # BRISQUE 계산 (낮을수록 좋음, 0-100)
             brisque_val = brisque(img_tensor, data_range=1.0, reduction='mean').item()
         except Exception as e:
-            # BRISQUE 계산 실패 시 (예: piq 로드 오류 등) 0.0으로 처리
             print(f"BRISQUE 계산 오류: {e}. BRISQUE 점수를 0.0으로 설정합니다.")
             
         return blur_score, brightness, brisque_val 
