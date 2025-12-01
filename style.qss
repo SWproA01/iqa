@@ -1,57 +1,76 @@
 /* 파일 이름: style.qss */
 
+/* 밝은 컬러 테마 — 그라데이션 없이 각각의 색을 고유하게 사용합니다. */
 QWidget {
-    background-color: #2E2E2E; color: #E0E0E0; font-family: 'Segoe UI', 'Malgun Gothic', 'Arial';
+    background-color: #EAF8FF; /* 밝은 하늘색 배경 */
+    color: #012433; /* 짙은 청록색 텍스트 */
+    font-family: 'Segoe UI', 'Malgun Gothic', 'Arial';
     font-size: 10pt;
 }
-QMainWindow { background-color: #252525; }
+
+QMainWindow { background-color: #FFFFFF; }
+
+/* 기본 버튼 (작은 동작 버튼) */
 QPushButton {
-    background-color: #555555; color: #FFFFFF; border: none;
-    padding: 8px 16px; border-radius: 4px; font-weight: bold;
+    background-color: #CDF5FD; /* 연한 하늘색 */
+    color: #012433; border: 1px solid #A0E9FF;
+    padding: 8px 14px; border-radius: 6px; font-weight: 600;
 }
-QPushButton:hover { background-color: #6A6A6A; }
-QPushButton:pressed { background-color: #4A4A4A; }
+QPushButton:hover { background-color: #A0E9FF; }
+QPushButton:pressed { background-color: #89CFF3; }
+
+/* 큰 기능 카드형 버튼 — 각 버튼은 단색으로 지정 */
 QPushButton#FunctionButton {
-    background-color: #3A3A3A; border: 1px solid #555555;
-    border-radius: 8px; padding: 20px; text-align: left;
-    min-height: 100px; /* 버튼 높이 유지 */
+    background-color: #00A9FF; /* 핵심 액센트 색 */
+    color: #FFFFFF; /* 흰색 텍스트 */
+    border: 1px solid #012433; /* 명확한 경계 */
+    border-radius: 10px; padding: 16px; text-align: left;
+    min-height: 110px;
 }
+QPushButton#FunctionButton QLabel { background: transparent; }
 QPushButton#FunctionButton:hover {
-    background-color: #4A4A4A; border: 1px solid #777777;
+    background-color: #89CFF3; /* hover는 두번째 색 사용 */
+    color: #012433;
+    border: 1px solid #012433;
 }
+
 QLabel { background-color: transparent; }
 QLabel#TitleLabel {
-    font-size: 20pt; font-weight: bold; color: #FFFFFF; padding-bottom: 10px;
+    font-size: 20pt; font-weight: 700; color: #012433; padding-bottom: 10px;
 }
-QLabel#SubtitleLabel { font-size: 11pt; color: #AAAAAA; }
+QLabel#SubtitleLabel { font-size: 11pt; color: #89CFF3; }
+
 QTableWidget {
-    background-color: #3A3A3A; border: 1px solid #555555;
-    gridline-color: #555555; border-radius: 4px;
+    background-color: #FFFFFF; border: 1px solid #A0E9FF;
+    gridline-color: #CDF5FD; border-radius: 6px;
 }
-QTableWidget::item { padding: 5px; }
+QTableWidget::item { padding: 6px; }
 QHeaderView::section {
-    background-color: #4A4A4A; color: #FFFFFF; padding: 5px;
-    border: none; font-weight: bold;
+    background-color: #A0E9FF; /* 헤더에 세번째 색 */
+    color: #012433; padding: 6px; border: none; font-weight: 700;
 }
-QTableCornerButton::section { background-color: #4A4A4A; }
-QTableWidget::item:alternate { background-color: #424242; }
-QTableWidget::item:selected { background-color: #0078D7; color: #FFFFFF; }
+QTableCornerButton::section { background-color: #89CFF3; }
+QTableWidget::item:alternate { background-color: #F5FBFF; }
+QTableWidget::item:selected { background-color: #89CFF3; color: #012433; }
+
+/* 드롭 존 */
 QLabel#DropZone {
-    background-color: #3A3A3A; border: 2px dashed #777777;
-    border-radius: 8px; color: #AAAAAA;
-    font-size: 12pt; font-weight: bold;
+    background-color: #FFFFFF; border: 2px dashed #00A9FF;
+    border-radius: 8px; color: #012433;
+    font-size: 12pt; font-weight: 700;
 }
-QLabel#DropZone:hover { border-color: #0078D7; color: #E0E0E0; }
+QLabel#DropZone:hover { border-color: #89CFF3; color: #012433; }
+
 QLabel#ImagePreview {
-    background-color: #252525; border: 1px solid #555555;
-    border-radius: 4px; color: #777777; font-style: italic;
+    background-color: #FFFFFF; border: 1px solid #A0E9FF;
+    border-radius: 6px; color: #012433; font-style: italic;
 }
+
 QSlider::groove:horizontal {
-    border: 1px solid #555; background: #4A4A4A;
+    border: 1px solid #A0E9FF; background: #F0FBFF;
     height: 8px; border-radius: 4px;
 }
 QSlider::handle:horizontal {
-    background: #0078D7; border: 1px solid #0078D7;
-    width: 18px; margin: -5px 0; border-radius: 9px;
+    background: #00A9FF; border: 1px solid #012433; width: 18px; margin: -5px 0; border-radius: 9px;
 }
-QSlider::sub-page:horizontal { background: #0078D7; border-radius: 4px; }
+QSlider::sub-page:horizontal { background: #89CFF3; border-radius: 4px; }

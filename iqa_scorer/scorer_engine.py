@@ -18,13 +18,8 @@ class HybridScorer:
         # 1. 최종 점수 가중치 (총합 1.0)
         self.W_AESTHETIC = 0.65      # 미적 점수 가중치 (CLIP)
         self.W_TECHNICAL = 0.35      # 기술 점수 가중치 (Laplacian + BRISQUE)
-        
-        # 2. 기술 점수 내부 가중치 (총합 1.0)
-        # T_score = (W_T_LAP * Laplacian_Score) + (W_T_BRISQUE * BRISQUE_Score)
         self.W_T_LAPLACIAN = 0.6     # Laplacian 중요도 (선명도)
         self.W_T_BRISQUE = 0.4       # BRISQUE 중요도 (일반적 품질)
-        
-        # 3. 정규화 및 밝기 기준
         self.LAPLACIAN_MAX = 1000.0  # Laplacian 정규화 기준
         self.BRIGHT_LOWER = 30.0
         self.BRIGHT_UPPER = 220.0
