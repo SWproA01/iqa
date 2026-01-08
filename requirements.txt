@@ -8,3 +8,6 @@ Pillow
 torch
 transformers
 piq
+PyPDF2
+python-docx
+olefile

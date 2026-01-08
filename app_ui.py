@@ -70,7 +70,8 @@ class MainDropAnalyzePage(QWidget):
         self.current_similar_groups = []  # 유사도 검사 결과 저장
         self.current_quality_results = []  # 품질 검사 결과 저장
         self.first_selected_image = None  # 유사 이미지 비교 첫 선택
-        self.compare_rows = []  # 하이라이트 유지할 행들 (최대 2)
+        self.first_selected_doc = None  # 문서 유사도 비교 첫 선택
+        self.first_selected_video = None  # 비디오 유사도 비교 첫 선택
 
         # 메인 레이아웃 (좌우 분할)
         main_h_layout = QHBoxLayout(self)
@@ -84,7 +85,7 @@ class MainDropAnalyzePage(QWidget):
         left_layout.setSpacing(15)
 
         # 타이틀
-        title = QLabel("파일 유틸리티")
+        title = QLabel("하루 정리")
         title.setObjectName("TitleLabel")
         title.setAlignment(Qt.AlignCenter)
         left_layout.addWidget(title)
@@ -209,27 +210,71 @@ class MainDropAnalyzePage(QWidget):
         img_compare_layout = QVBoxLayout(self.img_compare_widget)
         self.img_preview_top = QLabel("이미지 1")
         self.img_preview_top.setAlignment(Qt.AlignCenter)
-        self.img_preview_top.setStyleSheet("border: 2px solid #00A9FF; background: white;")
+        self.img_preview_top.setStyleSheet("border: 2px solid #00A9FF; background: #E8E8E8;")
         self.img_preview_top.setMinimumHeight(200)
         self.img_preview_bottom = QLabel("이미지 2")
         self.img_preview_bottom.setAlignment(Qt.AlignCenter)
-        self.img_preview_bottom.setStyleSheet("border: 2px solid #00A9FF; background: white;")
+        self.img_preview_bottom.setStyleSheet("border: 2px solid #00A9FF; background: #E8E8E8;")
         self.img_preview_bottom.setMinimumHeight(200)
         img_compare_layout.addWidget(self.img_preview_top)
         img_compare_layout.addWidget(self.img_preview_bottom)
         self.viz_stack.addWidget(self.img_compare_widget)
         
-        # 3: 문서 유사도 - 텍스트 미리보기
-        self.doc_preview = QTextEdit()
-        self.doc_preview.setReadOnly(True)
-        self.doc_preview.setPlaceholderText("문서를 선택하면 미리보기가 표시됩니다.")
-        self.viz_stack.addWidget(self.doc_preview)
+        # 3: 문서 유사도 - 텍스트 미리보기 (2개 영역)
+        self.doc_compare_widget = QWidget()
+        doc_compare_layout = QVBoxLayout(self.doc_compare_widget)
+        
+        doc_top_label = QLabel("🔷 첫 번째 문서")
+        doc_top_label.setStyleSheet("font-weight: bold; color: #00A9FF; font-size: 10pt;")
+        self.doc_preview_top = QTextEdit()
+        self.doc_preview_top.setReadOnly(True)
+        self.doc_preview_top.setPlaceholderText("첫 번째 문서를 선택하세요.")
+        self.doc_preview_top.setStyleSheet("border: 2px solid #00A9FF; background: #FFFFFF;")
+        
+        doc_bottom_label = QLabel("🔷 두 번째 문서")
+        doc_bottom_label.setStyleSheet("font-weight: bold; color: #89CFF3; font-size: 10pt;")
+        self.doc_preview_bottom = QTextEdit()
+        self.doc_preview_bottom.setReadOnly(True)
+        self.doc_preview_bottom.setPlaceholderText("두 번째 문서를 선택하세요.")
+        self.doc_preview_bottom.setStyleSheet("border: 2px solid #89CFF3; background: #FFFFFF;")
+        
+        doc_compare_layout.addWidget(doc_top_label)
+        doc_compare_layout.addWidget(self.doc_preview_top, 1)
+        doc_compare_layout.addWidget(doc_bottom_label)
+        doc_compare_layout.addWidget(self.doc_preview_bottom, 1)
+        
+        self.viz_stack.addWidget(self.doc_compare_widget)
+        
+        # 4: 비디오 유사도 - 비디오 정보 2개 영역
+        self.video_compare_widget = QWidget()
+        video_compare_layout = QVBoxLayout(self.video_compare_widget)
+        
+        video_top_label = QLabel("🔷 첫 번째 비디오")
+        video_top_label.setStyleSheet("font-weight: bold; color: #00A9FF; font-size: 10pt;")
+        self.video_preview_top = QLabel("첫 번째 비디오를 더블클릭하세요.")
+        self.video_preview_top.setAlignment(Qt.AlignCenter)
+        self.video_preview_top.setStyleSheet("border: 3px solid #00A9FF; background: #E8E8E8; padding: 10px; font-size: 10pt; color: #555;")
+        
+        video_bottom_label = QLabel("🔷 두 번째 비디오")
+        video_bottom_label.setStyleSheet("font-weight: bold; color: #89CFF3; font-size: 10pt;")
+        self.video_preview_bottom = QLabel("두 번째 비디오를 더블클릭하세요.")
+        self.video_preview_bottom.setAlignment(Qt.AlignCenter)
+        self.video_preview_bottom.setStyleSheet("border: 3px solid #89CFF3; background: #E8E8E8; padding: 10px; font-size: 10pt; color: #555;")
+        
+        video_compare_layout.addWidget(video_top_label)
+        video_compare_layout.addWidget(self.video_preview_top, 1)
+        video_compare_layout.addWidget(video_bottom_label)
+        video_compare_layout.addWidget(self.video_preview_bottom, 1)
+        
+        self.viz_stack.addWidget(self.video_compare_widget)
         
         right_layout.addWidget(self.viz_stack)
         
         # 좌우 배치 (6:4 비율)
         main_h_layout.addWidget(left_widget, 5)
         main_h_layout.addWidget(right_widget, 7)
+
+        self.first_selected_doc = None
 
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
@@ -371,7 +416,10 @@ class MainDropAnalyzePage(QWidget):
         try:
             threshold = 60  # 기본값
             groups = app_logic.find_similar_videos_from_folder(self.folder_path, threshold)
+            self.current_analysis_type = "similar_video"
+            self.current_similar_groups = groups
             self.display_similar_groups(groups, "비디오")
+            self.viz_stack.setCurrentIndex(4)  # 비디오 비교 뷰 표시
             self.info_label.setText(f"✅ 유사 비디오 분석 완료")
         except Exception as e:
             QMessageBox.critical(self, "오류", f"유사 비디오 분석 중 오류 발생:\n{str(e)}")
@@ -673,26 +721,70 @@ class MainDropAnalyzePage(QWidget):
             # 더블클릭 시 이미지 비교 표시
             if not self.first_selected_image:
                 self.first_selected_image = clicked_path
-                self.show_image_comparison(clicked_path, clicked_path)
+                # 첫 번째 이미지만 표시
+                pixmap = QPixmap(clicked_path)
+                if not pixmap.isNull():
+                    scaled = pixmap.scaled(self.img_preview_top.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                    filename = os.path.basename(clicked_path)
+                    
+                    # 위쪽: 첫 번째 이미지 표시
+                    self.img_preview_top.setPixmap(scaled)
+                    self.img_preview_top.setText("")  # 텍스트 제거하여 이미지만 표시
+                    self.img_preview_top.setStyleSheet(
+                        "border: 4px solid #00A9FF; background: #E8E8E8; padding: 5px;"
+                    )
+                    self.img_preview_top.setAlignment(Qt.AlignCenter)
+                    
+                    # 아래쪽: 안내 메시지
+                    self.img_preview_bottom.clear()
+                    self.img_preview_bottom.setPixmap(QPixmap())
+                    self.img_preview_bottom.setText(
+                        f"✅ 첫 번째 선택: {filename}\n\n"
+                        "━━━━━━━━━━━━━━━━━━━━\n\n"
+                        "🖼️ 두 번째 이미지를\n더블클릭하여 선택하세요"
+                    )
+                    self.img_preview_bottom.setStyleSheet(
+                        "border: 2px dashed #89CFF3; background: #F0F8FF; "
+                        "padding: 20px; font-size: 11pt; color: #0078D7; font-weight: bold;"
+                    )
+                    self.img_preview_bottom.setAlignment(Qt.AlignCenter)
             else:
                 self.show_image_comparison(self.first_selected_image, clicked_path)
                 self.first_selected_image = None  # 다음 비교를 위해 초기화
         
         elif self.current_analysis_type == "similar_doc":
-            # 유사 문서: 첫 번째 문서의 텍스트 미리보기
-            if row > 0 and row - 1 < len(self.current_similar_groups):
-                group = self.current_similar_groups[row - 1]
-                # group의 타입에 따라 경로 추출
-                if isinstance(group, dict):
-                    doc_paths = list(group.keys())
-                elif isinstance(group, list) and len(group) > 0 and isinstance(group[0], tuple):
-                    # 튜플 리스트: [(path, similarity), ...]
-                    doc_paths = [item[0] for item in group]
-                else:
-                    doc_paths = group
+            # 유사 문서: 첫 번째/두 번째 선택 처리
+            details_item = self.analysis_result_table.item(row, 3)
+            if details_item:
+                clicked_path = details_item.data(Qt.UserRole)
+                if isinstance(clicked_path, list) and clicked_path:
+                    clicked_path = clicked_path[0]
                 
-                if doc_paths:
-                    self.show_document_preview(doc_paths[0])
+                if not self.first_selected_doc:
+                    # 첫 번째 문서 선택
+                    self.first_selected_doc = clicked_path
+                    self.show_document_preview(clicked_path)
+                else:
+                    # 두 번째 문서 선택 - 비교 실행
+                    self.show_document_comparison(self.first_selected_doc, clicked_path)
+                    self.first_selected_doc = None  # 초기화
+        
+        elif self.current_analysis_type == "similar_video":
+            # 유사 비디오: 첫 번째/두 번째 선택 처리
+            details_item = self.analysis_result_table.item(row, 3)
+            if details_item:
+                clicked_path = details_item.data(Qt.UserRole)
+                if isinstance(clicked_path, list) and clicked_path:
+                    clicked_path = clicked_path[0]
+                
+                if not self.first_selected_video:
+                    # 첫 번째 비디오 선택
+                    self.first_selected_video = clicked_path
+                    self.show_video_info(clicked_path)
+                else:
+                    # 두 번째 비디오 선택 - 비교 실행
+                    self.compare_videos(self.first_selected_video, clicked_path)
+                    self.first_selected_video = None  # 초기화
         
         elif self.current_analysis_type == "image_quality":
             # 이미지 품질: 선택한 이미지와 상세 점수 표시
@@ -705,34 +797,238 @@ class MainDropAnalyzePage(QWidget):
     def show_image_comparison(self, img_path1, img_path2):
         """두 이미지를 비교하여 표시"""
         try:
+            # 유사도 계산
+            similarity_info = ""
+            if img_path1 != img_path2:
+                ssim_score, phash_sim, hash_diff = app_logic.get_image_similarity(img_path1, img_path2)
+                if ssim_score is not None and phash_sim is not None:
+                    similarity_info = f"📊 유사도: {phash_sim:.2f}%"
+            
+            # 첫 번째 이미지
             pixmap1 = QPixmap(img_path1)
             if not pixmap1.isNull():
-                scaled1 = pixmap1.scaled(400, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                scaled1 = pixmap1.scaled(self.img_preview_top.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
                 self.img_preview_top.setPixmap(scaled1)
-                self.img_preview_top.setText("")
+                self.img_preview_top.setText("")  # 이미지만 표시
+                filename1 = os.path.basename(img_path1)
+                self.img_preview_top.setToolTip(f"🖼️ 첫 번째 이미지\n{filename1}")
+                self.img_preview_top.setStyleSheet(
+                    "border: 4px solid #00A9FF; background: #E8E8E8; padding: 5px;"
+                )
+                self.img_preview_top.setAlignment(Qt.AlignCenter)
             else:
-                self.img_preview_top.setText(f"이미지 로드 실패:\n{os.path.basename(img_path1)}")
+                self.img_preview_top.clear()
+                self.img_preview_top.setText(f"🖼️ 첫 번째 이미지\n\n이미지 로드 실패:\n{os.path.basename(img_path1)}")
+                self.img_preview_top.setStyleSheet(
+                    "border: 4px solid #00A9FF; background: #F0F8FF; padding: 10px; color: #0078D7;"
+                )
             
+            # 두 번째 이미지
             pixmap2 = QPixmap(img_path2)
             if not pixmap2.isNull():
-                scaled2 = pixmap2.scaled(400, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                scaled2 = pixmap2.scaled(self.img_preview_bottom.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
                 self.img_preview_bottom.setPixmap(scaled2)
-                self.img_preview_bottom.setText("")
+                self.img_preview_bottom.setText("")  # 이미지만 표시
+                filename2 = os.path.basename(img_path2)
+                tooltip_text = f"🖼️ 두 번째 이미지\n{filename2}"
+                if similarity_info:
+                    tooltip_text += f"\n\n{similarity_info}"
+                self.img_preview_bottom.setToolTip(tooltip_text)
+                self.img_preview_bottom.setStyleSheet(
+                    "border: 4px solid #89CFF3; background: #E8E8E8; padding: 5px;"
+                )
+                self.img_preview_bottom.setAlignment(Qt.AlignCenter)
             else:
-                self.img_preview_bottom.setText(f"이미지 로드 실패:\n{os.path.basename(img_path2)}")
+                self.img_preview_bottom.clear()
+                self.img_preview_bottom.setText(f"🖼️ 두 번째 이미지\n\n이미지 로드 실패:\n{os.path.basename(img_path2)}")
+                self.img_preview_bottom.setStyleSheet(
+                    "border: 4px solid #89CFF3; background: #F0F8FF; padding: 10px; color: #0078D7;"
+                )
+            
+            # 유사도 정보를 info_label에 표시
+            if similarity_info:
+                self.info_label.setText(f"<b>이미지 비교 결과</b><br><br>{similarity_info}")
+                self.info_label.setStyleSheet("padding: 15px; font-size: 11pt; background: #E8F4F8; border-radius: 8px; color: #012433;")
+                self.info_label.setAlignment(Qt.AlignCenter)
+                
         except Exception as e:
             self.img_preview_top.setText(f"오류: {str(e)}")
             self.img_preview_bottom.setText("")
 
 
 
-    def show_document_preview(self, doc_path):
-        """문서 내용 미리보기"""
+    def show_document_preview(self, doc_path, is_first=True):
+        """첫 번째 문서 선택 시 호출: 위쪽 박스 채우기 + 안내 메시지"""
+        filename = os.path.basename(doc_path)
         try:
-            preview_text = app_logic.extract_text_from_file(doc_path, max_chars=2000)
-            self.doc_preview.setText(f"📄 {os.path.basename(doc_path)}\n\n{preview_text}")
+            # 텍스트 추출
+            preview_text = app_logic.extract_text_from_file(doc_path, max_chars=1500)
+            
+            # 위쪽 박스 (첫 번째 문서)
+            self.doc_preview_top.setText(f"📄 파일명: {filename}\n{'='*40}\n\n{preview_text}")
+            
+            # 아래쪽 박스 (안내 문구)
+            self.doc_preview_bottom.clear()
+            self.doc_preview_bottom.setPlaceholderText("비교할 두 번째 문서를 목록에서 더블클릭하세요.")
+            
+            # 중앙 안내 문구 업데이트
+            self.info_label.setText(
+                f"<div style='font-size: 11pt; font-weight: bold;'>✅ 첫 번째 문서 선택됨</div><br>"
+                f"두 번째 문서를 더블클릭하세요"
+            )
+            self.info_label.setStyleSheet("padding: 20px; background: #E8F4F8; border: 3px solid #00A9FF; border-radius: 8px; color: #012433;")
+            
         except Exception as e:
-            self.doc_preview.setText(f"문서 미리보기 실패:\n{str(e)}")
+            self.doc_preview_top.setText(f"문서 미리보기 오류: {str(e)}")
+
+    def show_document_comparison(self, path1, path2):
+        """두 번째 문서 선택 시 호출: 아래쪽 박스 채우기 + 유사도 계산"""
+        name1 = os.path.basename(path1)
+        name2 = os.path.basename(path2)
+        
+        self.info_label.setText("📊 문서 비교 분석 중...")
+        QApplication.processEvents()
+        
+        try:
+            # 텍스트 추출 (비교를 위해 넉넉하게 추출)
+            t1 = app_logic.extract_text_from_file(path1, max_chars=50000)
+            t2 = app_logic.extract_text_from_file(path2, max_chars=50000)
+            
+            # 유사도 계산
+            score = app_logic.calculate_text_similarity(t1, t2)
+            
+            # === 1. 중앙 안내창에 유사도 표시 ===
+            self.info_label.setText(f"<b>문서 비교 결과</b><br><br>📊 유사도: {score:.1f}%")
+            self.info_label.setStyleSheet("padding: 15px; font-size: 11pt; background: #E8F4F8; border-radius: 8px; color: #012433;")
+            self.info_label.setAlignment(Qt.AlignCenter)
+            
+            # === 2. 아래쪽 박스 (두 번째 문서 내용) ===
+            self.doc_preview_bottom.setText(f"📄 파일명: {name2}\n{'='*40}\n\n{t2[:1500]}")
+            
+        except Exception as e:
+            self.info_label.setText(f"❌ 오류 발생: {str(e)}")
+            self.info_label.setStyleSheet("color: red; border: 2px solid red;")
+
+    def extract_video_thumbnail(self, video_path):
+        """비디오에서 첫 프레임을 추출하여 QPixmap으로 반환"""
+        try:
+            import cv2
+            import numpy as np
+            from PyQt5.QtGui import QImage
+            
+            cap = cv2.VideoCapture(video_path)
+            ret, frame = cap.read()
+            cap.release()
+            
+            if ret and frame is not None:
+                # BGR to RGB 변환
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                height, width, channel = frame_rgb.shape
+                bytes_per_line = 3 * width
+                
+                # QImage로 변환
+                q_image = QImage(frame_rgb.data, width, height, bytes_per_line, QImage.Format_RGB888)
+                
+                # QPixmap으로 변환
+                pixmap = QPixmap.fromImage(q_image)
+                return pixmap
+            else:
+                return None
+        except Exception as e:
+            print(f"써네일 추출 오류: {e}")
+            return None
+
+    def show_video_info(self, video_path):
+        """비디오 썸네일 표시"""
+        filename = os.path.basename(video_path)
+        try:
+            # 비디오 썸네일 추출
+            thumbnail = self.extract_video_thumbnail(video_path)
+            
+            if thumbnail and not thumbnail.isNull():
+                # 썸네일 표시
+                scaled = thumbnail.scaled(self.video_preview_top.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                self.video_preview_top.setPixmap(scaled)
+                self.video_preview_top.setText("")  # 텍스트 제거
+                self.video_preview_top.setToolTip(f"🎬 {filename}\n{video_path}")
+                self.video_preview_top.setStyleSheet(
+                    "border: 3px solid #00A9FF; background: #E8E8E8; padding: 5px;"
+                )
+                self.video_preview_top.setAlignment(Qt.AlignCenter)
+            else:
+                # 썸네일 추출 실패 시 텍스트로 표시
+                file_size = os.path.getsize(video_path)
+                size_str = app_logic.format_bytes(file_size)
+                info_text = f"🎬 {filename}\n\n파일 크기: {size_str}\n\n(썸네일 로드 실패)"
+                self.video_preview_top.setText(info_text)
+                self.video_preview_top.setStyleSheet(
+                    "border: 3px solid #00A9FF; background: #FFFFFF; "
+                    "padding: 15px; font-size: 10pt; color: #012433;"
+                )
+            
+            # 두 번째 영역은 안내 메시지
+            self.video_preview_bottom.clear()
+            self.video_preview_bottom.setPixmap(QPixmap())
+            self.video_preview_bottom.setText("두 번째 비디오를 더블클릭하세요.")
+            self.video_preview_bottom.setStyleSheet(
+                "border: 3px solid #89CFF3; background: #E8E8E8; "
+                "padding: 10px; font-size: 10pt; color: #555;"
+            )
+            
+        except Exception as e:
+            self.video_preview_top.setText(f"비디오 로드 오류: {str(e)}")
+
+    def compare_videos(self, video1, video2):
+        """두 비디오 비교"""
+        name1 = os.path.basename(video1)
+        name2 = os.path.basename(video2)
+        
+        self.info_label.setText("📊 비디오 비교 분석 중...")
+        QApplication.processEvents()
+        
+        try:
+            # 비디오 핑거프린트 추출
+            hashes1 = app_logic.extract_video_fingerprint(video1)
+            hashes2 = app_logic.extract_video_fingerprint(video2)
+            
+            if hashes1 is None or hashes2 is None:
+                self.info_label.setText("⚠️ 비디오를 읽을 수 없거나 너무 짧습니다.")
+                return
+            
+            # 유사도 계산
+            similarity = app_logic.calculate_video_similarity(hashes1, hashes2)
+            
+            # === 1. 중앙 영역에 유사도 표시 ===
+            self.info_label.setText(f"<b>비디오 비교 결과</b><br><br>📊 유사도: {similarity:.1f}%")
+            self.info_label.setStyleSheet("padding: 15px; font-size: 11pt; background: #E8F4F8; border-radius: 8px; color: #012433;")
+            self.info_label.setAlignment(Qt.AlignCenter)
+            
+            # === 2. 두 번째 비디오 썸네일 표시 ===
+            thumbnail2 = self.extract_video_thumbnail(video2)
+            
+            if thumbnail2 and not thumbnail2.isNull():
+                scaled2 = thumbnail2.scaled(self.video_preview_bottom.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                self.video_preview_bottom.setPixmap(scaled2)
+                self.video_preview_bottom.setText("")  # 텍스트 제거
+                self.video_preview_bottom.setToolTip(f"🎬 {name2}\n{video2}")
+                self.video_preview_bottom.setStyleSheet(
+                    "border: 3px solid #89CFF3; background: #E8E8E8; padding: 5px;"
+                )
+                self.video_preview_bottom.setAlignment(Qt.AlignCenter)
+            else:
+                # 썸네일 추출 실패 시 텍스트로 표시
+                file_size2 = os.path.getsize(video2)
+                size_str2 = app_logic.format_bytes(file_size2)
+                info_text2 = f"🎬 {name2}\n\n파일 크기: {size_str2}\n\n(썸네일 로드 실패)"
+                self.video_preview_bottom.setText(info_text2)
+                self.video_preview_bottom.setStyleSheet(
+                    "border: 3px solid #89CFF3; background: #FFFFFF; "
+                    "padding: 15px; font-size: 10pt; color: #012433;"
+                )
+            
+        except Exception as e:
+            self.info_label.setText(f"❌ 오류 발생: {str(e)}")
+            self.info_label.setStyleSheet("color: red; border: 2px solid red;")
 
     def show_quality_image_detail(self, img_path, result):
         """이미지 품질 검사 결과 상세 표시"""
@@ -782,7 +1078,7 @@ class MainDropAnalyzePage(QWidget):
             self.img_preview_bottom.setPixmap(QPixmap())
             self.img_preview_bottom.setText(detail_text.strip())
             self.img_preview_bottom.setStyleSheet(
-                "border: 2px solid #00A9FF; background: white; "
+                "border: 2px solid #00A9FF; background: #F5F5F5; "
                 "padding: 15px; font-size: 10pt; color: #012433; text-align: left;"
             )
             self.img_preview_bottom.setAlignment(Qt.AlignLeft | Qt.AlignTop)
@@ -794,11 +1090,10 @@ class MainDropAnalyzePage(QWidget):
 # --- Matplotlib 캔버스 위젯 (UI 클래스) (변경 없음) ---
 class MplCanvas(FigureCanvas):
     def __init__(self, parent=None, width=5, height=4, dpi=100):
-        # [참고] 여기서 'dark_background' 대신 plt.rcParams로 폰트를 설정했습니다.
-        # plt.style.use('dark_background') # 스타일시트가 이미 어두우므로 필수 아님
+        # Bright 테마로 설정
         self.fig = Figure(figsize=(width, height), dpi=dpi)
         self.axes = self.fig.add_subplot(111)
-        self.fig.patch.set_facecolor('#3A3A3A')
+        self.fig.patch.set_facecolor('#F5FBFF')
         super(MplCanvas, self).__init__(self.fig)
         self.setParent(parent)
 
@@ -807,13 +1102,13 @@ class StatisticsWidget(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setFrameShape(QFrame.StyledPanel)
-        self.setStyleSheet("background-color: #3A3A3A; border-radius: 4px;")
+        self.setStyleSheet("background-color: #F5FBFF; border-radius: 4px;")
         layout = QVBoxLayout(self)
         layout.setContentsMargins(10, 10, 10, 10)
         self.stats_label = QLabel("스캔할 폴더를 드래그하세요.")
         self.stats_label.setAlignment(Qt.AlignTop | Qt.AlignLeft)
         self.stats_label.setWordWrap(True)
-        self.stats_label.setStyleSheet("padding: 10px; font-size: 10pt; background-color: #2E2E2E; border-radius: 4px;")
+        self.stats_label.setStyleSheet("padding: 10px; font-size: 10pt; background-color: #FFFFFF; color: #012433; border-radius: 4px;")
         self.stats_label.setMinimumHeight(120)
         if MATPLOTLIB_AVAILABLE:
             self.canvas = MplCanvas(self, width=5, height=4, dpi=100)
@@ -974,7 +1269,7 @@ class DuplicateCheckPage(QWidget):
         if event.mimeData().hasUrls():
             event.accept()
             self.info_label.setText("\n\n좋습니다! 여기에 놓으세요.\n\n")
-            self.info_label.setStyleSheet("border-color: #0078D7; color: #E0E0E0;")
+            self.info_label.setStyleSheet("border-color: #0078D7; color: #012433;")
         else: event.ignore()
 
     def dragLeaveEvent(self, event): self.reset_page()
@@ -1226,7 +1521,7 @@ class SimilarImageScanPage(QWidget):
         if event.mimeData().hasUrls():
             event.accept()
             self.info_label.setText("\n\n좋습니다! 여기에 놓으세요.\n\n")
-            self.info_label.setStyleSheet("border-color: #0078D7; color: #E0E0E0;")
+            self.info_label.setStyleSheet("border-color: #0078D7; color: #012433;")
         else: event.ignore()
     def dragLeaveEvent(self, event):
         if self.first_file_path is None: self.reset_page()
@@ -1261,35 +1556,40 @@ class SimilarImageScanPage(QWidget):
         else:
             self.reset_page()
             self.info_label.setText("⚠️ 유효하지 않은 드롭입니다. 폴더나 파일을 드롭하세요.")
+    # [수정됨] app_ui.py 내부 SimilarVideoScanPage 클래스
+
     def handle_1v1_comparison(self, file1, file2):
-        self.info_label.setText(f"'{os.path.basename(file1)}'와\n'{os.path.basename(file2)}' 비교 중...")
-        self.info_label.setAlignment(Qt.AlignCenter)
-        self.info_label.setStyleSheet("")
-        QApplication.processEvents()
-        ssim_score, phash_sim, hash_diff = app_logic.get_image_similarity(file1, file2)
-        if ssim_score is None:
-            self.info_label.setText(f"⚠️ 두 파일 비교 중 오류 발생.\n지원되지 않는 이미지 형식이거나 파일이 손상되었습니다.")
-        else:
-            result_text = (f"<b>1:1 이미지 비교 결과:</b><br><br>"
+        self.info_label.setText(f"분석 중...\n{os.path.basename(file1)}\nvs\n{os.path.basename(file2)}")
+        QApplication.processEvents() # UI 멈춤 방지
+        
+        try:
+            hashes1 = app_logic.extract_video_fingerprint(file1)
+            hashes2 = app_logic.extract_video_fingerprint(file2)
+            
+            if hashes1 is None or hashes2 is None:
+                self.info_label.setText("⚠️ 비디오를 읽을 수 없거나 너무 짧습니다.")
+                return
+
+            similarity = app_logic.calculate_video_similarity(hashes1, hashes2)
+            
+            # --- [수정 1] 드롭존(info_label)에 표시할 텍스트 스타일 개선 ---
+            result_text = (f"<b>🎬 1:1 비디오 비교 결과</b><br><br>"
                            f"<b>파일 1:</b> {os.path.basename(file1)}<br>"
                            f"<b>파일 2:</b> {os.path.basename(file2)}<br><br>"
-                           f"구조적 유사도 (SSIM): <font size='+2'><b>{ssim_score:.2f}%</b></font><br>"
-                           f"콘텐츠 유사도 (pHash): <font size='+2'><b>{phash_sim:.2f}%</b></font><br>"
-                           f"<small>(pHash 차이: {hash_diff} / 64)</small>")
+                           f"📊 유사도: <font size='+2' color='#0078D7'><b>{similarity:.1f}%</b></font>")
+            
             self.info_label.setText(result_text)
-            self.info_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-            self.info_label.setStyleSheet("padding: 15px;")
-            group_data = [(file1, 100.0), (file2, phash_sim)]
+            self.info_label.setAlignment(Qt.AlignCenter)
+            self.info_label.setStyleSheet("padding: 20px; font-size: 11pt; background: #E8F4F8; border: 3px solid #00A9FF; border-radius: 8px; color: #012433;")
+            
+            # --- [수정 2] 테이블에도 결과 데이터 추가 (이미지 페이지와 동작 통일) ---
+            # 그룹 데이터 형식: [(경로1, 100.0), (경로2, 유사도)]
+            group_data = [(file1, 100.0), (file2, similarity)]
+            # populate_table은 그룹의 리스트를 받으므로 []로 한 번 더 감쌈
             self.populate_table([group_data])
-            threshold_percent = self.threshold_slider.value()
-            if phash_sim >= threshold_percent:
-                group_data = [(file1, 100.0), (file2, phash_sim)]
-                self.populate_table([group_data])
-            else:
-                self.result_table.setRowCount(0)
-            self.show_image_preview_by_path(file1, position="top")
-            self.show_image_preview_by_path(file2, position="bottom")
-            self.preview_stack.setCurrentIndex(0)
+            
+        except AttributeError:
+            self.info_label.setText("❌ 오류: app_logic.py에 비디오 처리 함수가 없습니다.")
     def handle_folder_scan(self, folder_path):
         self.info_label.setText(f"'{os.path.basename(folder_path)}' 스캔 중... (시간이 걸릴 수 있습니다)")
         self.info_label.setAlignment(Qt.AlignCenter)
@@ -1427,14 +1727,14 @@ class ImageQualityPage(QWidget):
         
         # Best Shot 미리보기 패널 (ImagePreview)
         self.best_shot_image = QLabel("검사할 이미지 파일을 포함한 폴더를 드롭하세요.")
-        self.best_shot_image.setStyleSheet("padding: 10px; background-color: #3A3A3A; border-radius: 4px; min-height: 200px;")
+        self.best_shot_image.setStyleSheet("padding: 10px; background-color: #E8E8E8; border-radius: 4px; min-height: 200px; color: #012433;")
         self.best_shot_image.setAlignment(Qt.AlignCenter)
         self.best_shot_image.setObjectName("ImagePreview")
         self.best_shot_image.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
         
         # 1위 이미지 통계 텍스트 전용 패널
         self.best_shot_stats = QLabel("")
-        self.best_shot_stats.setStyleSheet("padding: 10px; background-color: #2E2E2E; border-radius: 4px; max-height: 150px;")
+        self.best_shot_stats.setStyleSheet("padding: 10px; background-color: #FFFFFF; border: 1px solid #CDF5FD; border-radius: 4px; max-height: 150px; color: #012433;")
         self.best_shot_stats.setAlignment(Qt.AlignTop | Qt.AlignLeft)
         self.best_shot_stats.setWordWrap(True)
         
@@ -1495,7 +1795,7 @@ class ImageQualityPage(QWidget):
         if event.mimeData().hasUrls():
             event.accept()
             self.info_label.setText("\n\n좋습니다! 여기에 놓으세요.\n\n")
-            self.info_label.setStyleSheet("border-color: #0078D7; color: #E0E0E0;")
+            self.info_label.setStyleSheet("border-color: #0078D7; color: #012433;")
         else: event.ignore()
 
     def dropEvent(self, event):
@@ -1712,6 +2012,7 @@ class SimilarVideoScanPage(QWidget):
         self.controller = controller
         self.setAcceptDrops(True)
         self.first_file_path = None
+        self.first_selected_video = None  # 첫 번째 선택된 비디오
         
         # 비디오 확장자 정의
         self.VIDEO_EXTENSIONS = ('.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm', '.m4v')
@@ -1759,20 +2060,31 @@ class SimilarVideoScanPage(QWidget):
         self.result_table.verticalHeader().setVisible(False)
         self.result_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.result_table.setAlternatingRowColors(True)
+        self.result_table.cellDoubleClicked.connect(self.on_video_double_clicked)  # 더블클릭 연결
         
         left_layout.addWidget(self.info_label, 1)
         left_layout.addWidget(slider_box)
         left_layout.addWidget(self.result_table, 3)
 
-        # --- 오른쪽 레이아웃 (컨트롤 버튼) ---
+        # --- 오른쪽 레이아웃 (비디오 미리보기 2개) ---
         right_layout = QVBoxLayout()
         right_layout.setSpacing(10)
         
-        # 비디오는 썸네일 미리보기가 복잡하므로 텍스트 안내로 대체하거나 생략
-        self.preview_label = QLabel("비디오 파일은 미리보기를 지원하지 않습니다.\n파일 경로를 확인하세요.")
-        self.preview_label.setAlignment(Qt.AlignCenter)
-        self.preview_label.setStyleSheet("color: #777; font-style: italic; border: 1px solid #555; border-radius: 4px;")
-        self.preview_label.setMinimumSize(350, 350)
+        # 첫 번째 비디오 미리보기
+        video_top_label = QLabel("🔷 첫 번째 비디오")
+        video_top_label.setStyleSheet("font-weight: bold; color: #00A9FF; font-size: 10pt;")
+        self.video_preview_top = QLabel("첫 번째 비디오를 더블클릭하세요.")
+        self.video_preview_top.setAlignment(Qt.AlignCenter)
+        self.video_preview_top.setStyleSheet("border: 3px solid #00A9FF; background: #E8E8E8; padding: 10px; font-size: 10pt; color: #555;")
+        self.video_preview_top.setMinimumHeight(150)
+        
+        # 두 번째 비디오 미리보기
+        video_bottom_label = QLabel("🔷 두 번째 비디오")
+        video_bottom_label.setStyleSheet("font-weight: bold; color: #89CFF3; font-size: 10pt;")
+        self.video_preview_bottom = QLabel("두 번째 비디오를 더블클릭하세요.")
+        self.video_preview_bottom.setAlignment(Qt.AlignCenter)
+        self.video_preview_bottom.setStyleSheet("border: 3px solid #89CFF3; background: #E8E8E8; padding: 10px; font-size: 10pt; color: #555;")
+        self.video_preview_bottom.setMinimumHeight(150)
 
         reset_btn = QPushButton("다시 하기")
         reset_btn.setIcon(QApplication.style().standardIcon(QStyle.SP_BrowserReload))
@@ -1782,7 +2094,10 @@ class SimilarVideoScanPage(QWidget):
         back_btn.setIcon(QApplication.style().standardIcon(QStyle.SP_ArrowBack))
         back_btn.clicked.connect(lambda: self.controller.setCurrentIndex(0))
 
-        right_layout.addWidget(self.preview_label, 1)
+        right_layout.addWidget(video_top_label)
+        right_layout.addWidget(self.video_preview_top, 1)
+        right_layout.addWidget(video_bottom_label)
+        right_layout.addWidget(self.video_preview_bottom, 1)
         right_layout.addWidget(reset_btn)
         right_layout.addWidget(back_btn)
 
@@ -1816,7 +2131,7 @@ class SimilarVideoScanPage(QWidget):
         if event.mimeData().hasUrls():
             event.accept()
             self.info_label.setText("\n\n좋습니다! 여기에 놓으세요.\n\n")
-            self.info_label.setStyleSheet("border-color: #0078D7; color: #E0E0E0;")
+            self.info_label.setStyleSheet("border-color: #0078D7; color: #012433;")
         else:
             event.ignore()
 
@@ -1863,9 +2178,9 @@ class SimilarVideoScanPage(QWidget):
                 # 첫 번째 파일 등록
                 self.first_file_path = dropped_file
                 filename = os.path.basename(dropped_file)
-                self.info_label.setText(f"<b>첫 번째 비디오 등록됨:</b><br>{filename}<br><br>비교할 두 번째 비디오를 드롭하세요.")
+                self.info_label.setText(f"✅ <b>첫 번째 비디오 선택 완료</b><br><br>🎬 {filename}<br><br>━━━━━━━━━━━━━━━━━━━━<br><br>두 번째 비디오를 드롭하세요")
                 self.info_label.setAlignment(Qt.AlignCenter)
-                self.info_label.setStyleSheet("")
+                self.info_label.setStyleSheet("padding: 20px; background: #E8F4F8; border: 3px solid #00A9FF; border-radius: 8px; color: #012433; font-size: 11pt;")
             else:
                 # 두 번째 파일 등록 -> 1:1 비교 실행
                 self.handle_1v1_comparison(self.first_file_path, dropped_file)
@@ -1888,14 +2203,14 @@ class SimilarVideoScanPage(QWidget):
 
             similarity = app_logic.calculate_video_similarity(hashes1, hashes2)
             
-            result_text = (f"<b>1:1 비디오 비교 결과:</b><br><br>"
-                           f"<b>파일 A:</b> {os.path.basename(file1)}<br>"
-                           f"<b>파일 B:</b> {os.path.basename(file2)}<br><br>"
-                           f"구간 유사도: <font size='+2' color='#00FF00'><b>{similarity:.1f}%</b></font>")
+            result_text = (f"<b>비디오 비교 결과</b><br><br>"
+                           f"<b>🎬 첫 번째:</b> {os.path.basename(file1)}<br>"
+                           f"<b>🎬 두 번째:</b> {os.path.basename(file2)}<br><br>"
+                           f"<b>📊 유사도: <font size='+2' color='#0078D7'>{similarity:.1f}%</font></b>")
             
             self.info_label.setText(result_text)
-            self.info_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-            self.info_label.setStyleSheet("padding: 15px;")
+            self.info_label.setAlignment(Qt.AlignCenter)
+            self.info_label.setStyleSheet("padding: 15px; font-size: 11pt; background: #E8F4F8; border-radius: 8px; color: #012433;")
             
         except AttributeError:
             self.info_label.setText("❌ 오류: app_logic.py에 비디오 처리 함수가 없습니다.")
@@ -1965,6 +2280,147 @@ class SimilarVideoScanPage(QWidget):
                 
                 self.result_table.setItem(row_position, 0, path_item)
                 self.result_table.setItem(row_position, 1, score_item)
+
+    def on_video_double_clicked(self, row, column):
+        """비디오 테이블 더블클릭 시 호출"""
+        # 헤더 행은 무시
+        item = self.result_table.item(row, 0)
+        if not item or self.result_table.columnSpan(row, 0) > 1:
+            return
+        
+        clicked_path = item.text()
+        if not clicked_path or not os.path.isfile(clicked_path):
+            return
+        
+        if not self.first_selected_video:
+            # 첫 번째 비디오 선택
+            self.first_selected_video = clicked_path
+            self.show_video_info(clicked_path, is_first=True)
+        else:
+            # 두 번째 비디오 선택 - 비교 실행
+            self.compare_videos(self.first_selected_video, clicked_path)
+            self.first_selected_video = None  # 초기화
+
+    def extract_video_thumbnail(self, video_path):
+        """비디오에서 첫 프레임을 추출하여 QPixmap으로 반환"""
+        try:
+            import cv2
+            import numpy as np
+            from PyQt5.QtGui import QImage
+            
+            cap = cv2.VideoCapture(video_path)
+            ret, frame = cap.read()
+            cap.release()
+            
+            if ret and frame is not None:
+                # BGR to RGB 변환
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                height, width, channel = frame_rgb.shape
+                bytes_per_line = 3 * width
+                
+                # QImage로 변환
+                q_image = QImage(frame_rgb.data, width, height, bytes_per_line, QImage.Format_RGB888)
+                
+                # QPixmap으로 변환
+                pixmap = QPixmap.fromImage(q_image)
+                return pixmap
+            else:
+                return None
+        except Exception as e:
+            print(f"썸네일 추출 오류: {e}")
+            return None
+
+    def show_video_info(self, video_path, is_first=True):
+        """비디오 썸네일 표시"""
+        filename = os.path.basename(video_path)
+        try:
+            # 비디오 썸네일 추출
+            thumbnail = self.extract_video_thumbnail(video_path)
+            
+            if thumbnail and not thumbnail.isNull():
+                # 썸네일 표시
+                scaled = thumbnail.scaled(self.video_preview_top.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                self.video_preview_top.setPixmap(scaled)
+                self.video_preview_top.setText("")  # 텍스트 제거
+                self.video_preview_top.setToolTip(f"🎬 {filename}\n{video_path}")
+                self.video_preview_top.setStyleSheet(
+                    "border: 3px solid #00A9FF; background: #E8E8E8; padding: 5px;"
+                )
+                self.video_preview_top.setAlignment(Qt.AlignCenter)
+            else:
+                # 썸네일 추출 실패 시 텍스트로 표시
+                file_size = os.path.getsize(video_path)
+                size_str = app_logic.format_bytes(file_size)
+                info_text = f"🎬 {filename}\n\n파일 크기: {size_str}\n\n(썸네일 로드 실패)"
+                self.video_preview_top.setText(info_text)
+                self.video_preview_top.setStyleSheet(
+                    "border: 3px solid #00A9FF; background: #FFFFFF; "
+                    "padding: 15px; font-size: 10pt; color: #012433;"
+                )
+            
+            # 두 번째 영역은 안내 메시지
+            self.video_preview_bottom.clear()
+            self.video_preview_bottom.setPixmap(QPixmap())
+            self.video_preview_bottom.setText("두 번째 비디오를 더블클릭하세요.")
+            self.video_preview_bottom.setStyleSheet(
+                "border: 3px solid #89CFF3; background: #E8E8E8; "
+                "padding: 10px; font-size: 10pt; color: #555;"
+            )
+            
+        except Exception as e:
+            self.video_preview_top.setText(f"비디오 로드 오류: {str(e)}")
+
+    def compare_videos(self, video1, video2):
+        """두 비디오 비교"""
+        name1 = os.path.basename(video1)
+        name2 = os.path.basename(video2)
+        
+        self.info_label.setText("📊 비디오 비교 분석 중...")
+        QApplication.processEvents()
+        
+        try:
+            # 비디오 핑거프린트 추출
+            hashes1 = app_logic.extract_video_fingerprint(video1)
+            hashes2 = app_logic.extract_video_fingerprint(video2)
+            
+            if hashes1 is None or hashes2 is None:
+                self.info_label.setText("⚠️ 비디오를 읽을 수 없거나 너무 짧습니다.")
+                return
+            
+            # 유사도 계산
+            similarity = app_logic.calculate_video_similarity(hashes1, hashes2)
+            
+            # === 1. 중앙 영역에 유사도 표시 ===
+            self.info_label.setText(f"<b>비디오 비교 결과</b><br><br>📊 유사도: {similarity:.1f}%")
+            self.info_label.setStyleSheet("padding: 15px; font-size: 11pt; background: #E8F4F8; border-radius: 8px; color: #012433;")
+            self.info_label.setAlignment(Qt.AlignCenter)
+            
+            # === 2. 두 번째 비디오 썸네일 표시 ===
+            thumbnail2 = self.extract_video_thumbnail(video2)
+            
+            if thumbnail2 and not thumbnail2.isNull():
+                scaled2 = thumbnail2.scaled(self.video_preview_bottom.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                self.video_preview_bottom.setPixmap(scaled2)
+                self.video_preview_bottom.setText("")  # 텍스트 제거
+                self.video_preview_bottom.setToolTip(f"🎬 {name2}\n{video2}")
+                self.video_preview_bottom.setStyleSheet(
+                    "border: 3px solid #89CFF3; background: #E8E8E8; padding: 5px;"
+                )
+                self.video_preview_bottom.setAlignment(Qt.AlignCenter)
+            else:
+                # 썸네일 추출 실패 시 텍스트로 표시
+                file_size2 = os.path.getsize(video2)
+                size_str2 = app_logic.format_bytes(file_size2)
+                info_text2 = f"🎬 {name2}\n\n파일 크기: {size_str2}\n\n(썸네일 로드 실패)"
+                self.video_preview_bottom.setText(info_text2)
+                self.video_preview_bottom.setStyleSheet(
+                    "border: 3px solid #89CFF3; background: #FFFFFF; "
+                    "padding: 15px; font-size: 10pt; color: #012433;"
+                )
+            
+        except Exception as e:
+            self.info_label.setText(f"❌ 오류 발생: {str(e)}")
+            self.info_label.setStyleSheet("color: red; border: 2px solid red;")
                 
                 
 # --- 문서 유사도 검사 화면 (UI 클래스) ---
@@ -2041,33 +2497,43 @@ class SimilarDocScanPage(QWidget):
         self.result_table.setColumnCount(2)
         self.result_table.setHorizontalHeaderLabels(["파일 경로", "유사도"])
         self.result_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        self.result_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
         self.result_table.verticalHeader().setVisible(False)
         self.result_table.setAlternatingRowColors(True)
         self.result_table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.result_table.cellClicked.connect(self.show_text_preview) # 클릭 시 텍스트 미리보기
+        # [수정] cellClicked 제거 - 더블클릭과 충돌 방지
+        self.result_table.cellDoubleClicked.connect(self.on_doc_double_clicked) # 더블클릭 시 1:1 비교
+        
+        # 첫 번째 선택된 문서 추적용
+        self.first_selected_doc = None
+        self.first_doc_text = None  # 첫 번째 문서의 텍스트 저장
 
         left_layout.addWidget(self.info_label, 1)
         left_layout.addWidget(slider_box)
         left_layout.addWidget(self.result_table, 3)
 
-        # 오른쪽: 텍스트 미리보기 패널
+        # 오른쪽: 텍스트 미리보기 패널 (2개 영역: 위/아래)
         right_layout = QVBoxLayout()
-        self.preview_label = QLabel("문서 미리보기")
-        self.preview_label.setAlignment(Qt.AlignCenter)
         
-        # 이미지가 아닌 텍스트를 보여줄 위젯 (QTextEdit)
-        self.text_preview = QTextEdit()
-        self.text_preview.setReadOnly(True)
-        self.text_preview.setPlaceholderText("결과 목록에서 파일을 클릭하면 내용 일부가 여기에 표시됩니다.")
-        self.text_preview.setStyleSheet("background-color: #252525; color: #DDD; border: 1px solid #555;")
+        # 첫 번째 문서 미리보기 (위쪽)
+        self.text_preview_top = QTextEdit()
+        self.text_preview_top.setReadOnly(True)
+        self.text_preview_top.setPlaceholderText("📄 첫 번째 문서를 더블클릭하세요")
+        self.text_preview_top.setStyleSheet("background-color: #FFFFFF; color: #012433; border: 3px solid #00A9FF; border-radius: 6px; padding: 10px;")
+        
+        # 두 번째 문서 미리보기 (아래쪽)
+        self.text_preview_bottom = QTextEdit()
+        self.text_preview_bottom.setReadOnly(True)
+        self.text_preview_bottom.setPlaceholderText("📄 두 번째 문서를 더블클릭하세요")
+        self.text_preview_bottom.setStyleSheet("background-color: #FFFFFF; color: #012433; border: 3px solid #89CFF3; border-radius: 6px; padding: 10px;")
 
         reset_btn = QPushButton("다시 하기")
         reset_btn.clicked.connect(self.reset_page)
         back_btn = QPushButton("뒤로 가기")
         back_btn.clicked.connect(lambda: self.controller.setCurrentIndex(0))
 
-        right_layout.addWidget(self.preview_label)
-        right_layout.addWidget(self.text_preview, 1)
+        right_layout.addWidget(self.text_preview_top, 1)
+        right_layout.addWidget(self.text_preview_bottom, 1)
         right_layout.addWidget(reset_btn)
         right_layout.addWidget(back_btn)
 
@@ -2091,15 +2557,22 @@ class SimilarDocScanPage(QWidget):
 
     def reset_page(self):
         self.first_file_path = None
+        self.first_selected_doc = None
+        self.first_doc_text = None  # 캐시 초기화
         self.info_label.setText(self.initial_text)
+        self.info_label.setAlignment(Qt.AlignCenter)
+        self.info_label.setStyleSheet("")
         self.result_table.setRowCount(0)
-        self.text_preview.clear()
+        self.text_preview_top.clear()
+        self.text_preview_top.setPlaceholderText("📄 첫 번째 문서를 더블클릭하세요")
+        self.text_preview_bottom.clear()
+        self.text_preview_bottom.setPlaceholderText("📄 두 번째 문서를 더블클릭하세요")
 
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
             event.accept()
             self.info_label.setText("\n\n좋습니다! 여기에 놓으세요.\n\n")
-            self.info_label.setStyleSheet("border-color: #0078D7; color: #E0E0E0;")
+            self.info_label.setStyleSheet("border-color: #0078D7; color: #012433;")
         else: event.ignore()
 
     def dropEvent(self, event):
@@ -2127,22 +2600,102 @@ class SimilarDocScanPage(QWidget):
             dropped = valid_docs[0]
             if self.first_file_path is None:
                 self.first_file_path = dropped
-                self.info_label.setText(f"첫 번째 문서: {os.path.basename(dropped)}\n두 번째 문서를 드롭하세요.")
+                filename = os.path.basename(dropped)
+                self.info_label.setText(f"✅ <b>첫 번째 문서 선택 완료</b><br><br>📄 {filename}<br><br>━━━━━━━━━━━━━━━━━━━━<br><br>두 번째 문서를 드롭하세요")
+                self.info_label.setAlignment(Qt.AlignCenter)
+                self.info_label.setStyleSheet("padding: 20px; background: #E8F4F8; border: 3px solid #00A9FF; border-radius: 8px; color: #012433; font-size: 11pt;")
+                
+                # 첫 번째 문서 내용 미리보기 표시
+                try:
+                    preview_text = app_logic.extract_text_from_file(dropped, max_chars=1000)
+                    self.text_preview.setText(f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
+                                              f"📄 첫 번째 문서: {filename}\n" +
+                                              f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n" +
+                                              preview_text)
+                except Exception as e:
+                    self.text_preview.setText(f"문서 미리보기 오류: {str(e)}")
             else:
                 self.handle_1v1(self.first_file_path, dropped)
                 self.first_file_path = None
 
+    # [수정됨] app_ui.py 내부 SimilarDocScanPage 클래스
+
     def handle_1v1(self, f1, f2):
-        self.info_label.setText("비교 분석 중...")
+        print(f"\n{'='*60}")
+        print(f"📄 문서 1:1 비교 시작")
+        print(f"파일 1: {f1}")
+        print(f"파일 2: {f2}")
+        
+        self.info_label.setText("📊 비교 분석 중...")
+        self.info_label.setAlignment(Qt.AlignCenter)
         QApplication.processEvents()
         
-        t1 = app_logic.extract_text_from_file(f1)
-        t2 = app_logic.extract_text_from_file(f2)
-        score = app_logic.calculate_text_similarity(t1, t2)
+        try:
+            # 첫 번째 문서는 저장된 텍스트 사용 (이미 읽었음)
+            if self.first_doc_text is not None:
+                t1 = self.first_doc_text
+                print(f"✅ 첫 번째 문서 텍스트 캐시 사용")
+            else:
+                t1 = app_logic.extract_text_from_file(f1, max_chars=20000000)
+                print(f"⚠️ 첫 번째 문서 텍스트 새로 읽음")
+            
+            # 두 번째 문서는 새로 읽기
+            t2 = app_logic.extract_text_from_file(f2, max_chars=20000000)
+            
+            print(f"텍스트 1 길이: {len(t1)} 자")
+            print(f"텍스트 2 길이: {len(t2)} 자")
+            
+            if not t1 or not t2:
+                self.info_label.setText("⚠️ 문서에서 텍스트를 추출할 수 없습니다.")
+                print("❌ 텍스트 추출 실패")
+                return
+            
+            score = app_logic.calculate_text_similarity(t1, t2)
+            print(f"✅ 계산된 유사도: {score:.2f}%")
+            
+            filename1 = os.path.basename(f1)
+            filename2 = os.path.basename(f2)
+            
+            # --- 드래그 앤 드롭 영역에 유사도 크게 표시 (이미지와 동일한 스타일) ---
+            result_text = (f"<b style='font-size: 14pt;'>📄 문서 비교 결과</b><br><br>"
+                           f"<div style='background: white; padding: 10px; border-radius: 6px; margin: 5px;'>"
+                           f"<b style='color: #00A9FF;'>🔷 첫 번째</b><br>"
+                           f"<span style='font-size: 9pt;'>{filename1}</span></div><br>"
+                           f"<div style='background: white; padding: 10px; border-radius: 6px; margin: 5px;'>"
+                           f"<b style='color: #89CFF3;'>🔷 두 번째</b><br>"
+                           f"<span style='font-size: 9pt;'>{filename2}</span></div><br><br>"
+                           f"<div style='background: white; padding: 20px; border-radius: 8px; border: 3px solid #0078D7;'>"
+                           f"<b style='font-size: 12pt;'>📊 유사도</b><br>"
+                           f"<span style='font-size: 32pt; color: #0078D7; font-weight: bold;'>{score:.1f}%</span></div>")
+            
+            self.info_label.setText(result_text)
+            self.info_label.setAlignment(Qt.AlignCenter)
+            self.info_label.setStyleSheet("padding: 20px; font-size: 10pt; background: #E8F4F8; border-radius: 8px; color: #012433;")
         
-        self.info_label.setText(f"1:1 비교 결과\n유사도: {score:.1f}%")
-        self.text_preview.setText(f"--- [파일 1 내용] ---\n{t1[:500]}...\n\n--- [파일 2 내용] ---\n{t2[:500]}...")
-
+            # --- 오른쪽 미리보기 창 업데이트 (위/아래 분리) ---
+            # 아래쪽: 두 번째 문서만 업데이트 (위쪽은 첫 번째 선택 시 이미 표시되어 있음)
+            print(f"📝 두 번째 문서 미리보기 업데이트 시작...")
+            print(f"   파일명: {filename2}")
+            print(f"   텍스트 길이: {len(t2)} 자")
+            print(f"   미리보기 길이: {len(t2[:1500])} 자")
+            
+            bottom_text = f"📄 두 번째 문서: {filename2}\n{'='*50}\n\n{t2[:1500]}"
+            self.text_preview_bottom.setText(bottom_text)
+            self.text_preview_bottom.setStyleSheet("background-color: #FFFFFF; color: #012433; border: 3px solid #89CFF3; border-radius: 6px; padding: 10px; font-size: 10pt;")
+            
+            print(f"✅ 두 번째 문서 미리보기 업데이트 완료")
+            print(f"   위젯 visible: {self.text_preview_bottom.isVisible()}")
+            print(f"   위젯 height: {self.text_preview_bottom.height()}")
+            print(f"{'='*60}\n")
+            
+        except Exception as e:
+            error_msg = f"⚠️ 문서 비교 중 오류 발생:\n{str(e)}"
+            self.info_label.setText(error_msg)
+            self.info_label.setAlignment(Qt.AlignCenter)
+            print(f"❌ 오류: {e}")
+            import traceback
+            traceback.print_exc()
+        
     def handle_folder_scan(self, folder):
         self.info_label.setText("폴더 내 문서 스캔 및 텍스트 추출 중...")
         QApplication.processEvents()
@@ -2172,12 +2725,65 @@ class SimilarDocScanPage(QWidget):
                 self.result_table.setItem(r, 0, QTableWidgetItem(path))
                 self.result_table.setItem(r, 1, QTableWidgetItem(f"{score:.1f}%"))
 
-    def show_text_preview(self, row, col):
-        # 파일 경로가 있는 셀(0열)을 클릭했거나 해당 행일 때
+    def on_doc_double_clicked(self, row, col):
+        """더블클릭 시 문서 1:1 비교"""
+        print("\n" + "="*70)
+        print("🔔 문서 더블클릭 이벤트")
+        print(f"클릭 위치: row={row}, col={col}")
+        
         path_item = self.result_table.item(row, 0)
-        if path_item and os.path.isfile(path_item.text()):
-            preview = app_logic.extract_text_from_file(path_item.text(), max_chars=1000)
-            self.text_preview.setText(preview)
+        if not path_item:
+            print("❌ path_item이 None입니다")
+            return
+        
+        clicked_path = path_item.text()
+        print(f"📁 클릭한 경로: {clicked_path}")
+        
+        # 그룹 헤더인 경우 무시
+        if not os.path.isfile(clicked_path):
+            print(f"⚠️ 파일이 아닙니다 (그룹 헤더)")
+            return
+        
+        print(f"✅ 유효한 파일입니다!")
+        
+        # 첫 번째 선택
+        if not self.first_selected_doc:
+            self.first_selected_doc = clicked_path
+            filename = os.path.basename(clicked_path)
+            print(f"📌 첫 번째 문서로 설정: {filename}")
+            
+            # 드래그 앤 드롭 영역 업데이트
+            self.info_label.setText(f"<b style='font-size: 14pt;'>📄 문서 선택</b><br><br>"
+                                   f"<div style='background: white; padding: 15px; border-radius: 8px; border: 3px solid #00A9FF;'>"
+                                   f"<b style='color: #00A9FF; font-size: 12pt;'>🔷 첫 번째 문서 선택 완료</b><br><br>"
+                                   f"<span style='font-size: 10pt;'>{filename}</span></div><br><br>"
+                                   f"<span style='font-size: 11pt;'>두 번째 문서를 더블클릭하세요</span>")
+            self.info_label.setAlignment(Qt.AlignCenter)
+            self.info_label.setStyleSheet("padding: 20px; background: #E8F4F8; border-radius: 8px; color: #012433;")
+            
+            # 첫 번째 문서 내용 미리보기 표시 (위쪽)
+            try:
+                # 첫 번째 문서의 전체 텍스트를 저장 (비교용)
+                self.first_doc_text = app_logic.extract_text_from_file(clicked_path, max_chars=20000000)
+                preview_text = self.first_doc_text[:1500]
+                self.text_preview_top.setText(f"📄 첫 번째 문서: {filename}\n"
+                                              f"{'='*50}\n\n"
+                                              f"{preview_text}")
+                self.text_preview_bottom.clear()
+                self.text_preview_bottom.setPlaceholderText("📄 두 번째 문서를 더블클릭하세요")
+            except Exception as e:
+                self.text_preview_top.setText(f"문서 미리보기 오류: {str(e)}")
+                self.first_doc_text = None
+        else:
+            # 두 번째 선택 - 비교 실행
+            filename2 = os.path.basename(clicked_path)
+            print(f"📊 두 번째 문서 선택 -> 유사도 비교 시작")
+            print(f"📌 두 번째 문서: {filename2}")
+            print(f"🔄 비교 시작: {os.path.basename(self.first_selected_doc)} vs {filename2}")
+            self.handle_1v1(self.first_selected_doc, clicked_path)
+            self.first_selected_doc = None
+            self.first_doc_text = None  # 캐시 초기화
+            print(f"✅ 비교 완료 및 초기화")
             
 
 
@@ -2462,7 +3068,7 @@ class UnifiedScanPage(QWidget):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("파일 유틸리티 Pro")
+        self.setWindowTitle("하루 정리")
         self.setGeometry(200, 200, 1000, 650) 
         self.stacked_widget = QStackedWidget()
         self.setCentralWidget(self.stacked_widget)
@@ -2492,7 +3098,13 @@ class MainWindow(QMainWindow):
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     
-    base_dir = os.path.dirname(os.path.abspath(__file__))
+    if getattr(sys, 'frozen', False):
+        # exe로 실행될 때: 실제 exe 파일이 있는 폴더를 기준(base_dir)으로 잡음
+        base_dir = os.path.dirname(sys.executable)
+    else:
+        # 파이썬으로 실행될 때: 현재 파일 위치를 기준으로 잡음
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+
     style_file_path = os.path.join(base_dir, "style.qss")
     
     print(f"스타일시트 로드 시도: {style_file_path}")

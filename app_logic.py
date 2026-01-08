@@ -485,7 +485,7 @@ def get_hwp_text(filename):
         
     return text
 
-def extract_text_from_file(filepath, max_chars=3000):
+def extract_text_from_file(filepath, max_chars=100000):
     """
     파일 확장자에 따라 적절한 방식으로 텍스트를 추출합니다.
     [수정 사항] SMI, SRT 등 자막 파일을 위해 UTF-16 및 Latin-1 폴백 추가
