@@ -1,0 +1,13 @@
+PyQt5
+matplotlib
+opencv-python
+scikit-image
+numpy
+ImageHash
+Pillow
+torch
+transformers
+piq
+PyPDF2
+python-docx
+olefile

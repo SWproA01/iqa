@@ -14,7 +14,10 @@ from skimage.metrics import structural_similarity as ssim
 import numpy as np
 import imagehash
 from PIL import Image
-from difflib import SequenceMatcher 
+from difflib import SequenceMatcher
+import difflib
+import zlib
+import struct
 
 
 # --- 헬퍼 함수 (변경 없음) ---
@@ -265,3 +268,435 @@ def analyze_image_quality_in_folder(folder_path):
     results.sort(key=lambda x: x['score_data']['final_score'], reverse=True)
     
     return results, True
+
+
+# --- 유사 비디오 스캔 로직 ---
+
+def extract_video_fingerprint(video_path, num_frames=10):
+    """
+    비디오에서 균등한 간격으로 num_frames만큼 프레임을 추출하여
+    각 프레임의 pHash 리스트를 반환합니다.
+    """
+    hashes = []
+    
+    # [주의] Windows에서 opencv의 VideoCapture는 한글 경로에 취약할 수 있습니다.
+    # 만약 열리지 않는다면 경로를 그대로 넣지 말고 임시 파일 등을 활용해야 할 수 있으나,
+    # 최신 opencv-python은 대부분 지원합니다.
+    cap = cv2.VideoCapture(video_path)
+    
+    if not cap.isOpened():
+        return None # 비디오 열기 실패
+    
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    if total_frames <= 0:
+        cap.release()
+        return None
+
+    # 프레임 추출 간격 계산
+    step = total_frames // (num_frames + 1)
+    
+    current_frame = step
+    for _ in range(num_frames):
+        cap.set(cv2.CAP_PROP_POS_FRAMES, current_frame)
+        ret, frame = cap.read()
+        if ret:
+            # OpenCV(BGR) -> PIL Image 변환
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            pil_img = Image.fromarray(frame_rgb)
+            
+            # pHash 계산
+            phash = imagehash.phash(pil_img)
+            hashes.append(phash)
+        
+        current_frame += step
+        
+    cap.release()
+    
+    # 추출된 프레임이 너무 적으면 실패 처리
+    if len(hashes) < num_frames // 2:
+        return None
+        
+    return hashes
+
+def calculate_video_similarity(hashes1, hashes2):
+    """
+    두 비디오의 해시 리스트를 비교하여 유사도(0~100%) 반환
+    """
+    if not hashes1 or not hashes2:
+        return 0.0
+    
+    # 더 짧은 길이에 맞춤
+    min_len = min(len(hashes1), len(hashes2))
+    match_count = 0
+    
+    # 해밍 거리 임계값 (이미지 유사도와 동일하게 설정, 예: 10 이하)
+    HAMMING_THRESHOLD = 10 
+    
+    for i in range(min_len):
+        diff = hashes1[i] - hashes2[i]
+        if diff <= HAMMING_THRESHOLD:
+            match_count += 1
+            
+    return (match_count / min_len) * 100.0
+
+def group_video_hashes(hashes_dict, threshold):
+    """비디오 해시 딕셔너리를 받아 유사도 임계값(%) 기준으로 그룹화"""
+    video_paths = list(hashes_dict.keys())
+    groups = []
+    processed = set()
+    
+    for i in range(len(video_paths)):
+        path1 = video_paths[i]
+        if path1 in processed: continue
+        
+        current_group = {path1: 100.0}
+        hashes1 = hashes_dict[path1]
+        
+        for j in range(i + 1, len(video_paths)):
+            path2 = video_paths[j]
+            if path2 in processed: continue
+            
+            hashes2 = hashes_dict[path2]
+            
+            # 두 비디오의 유사도 계산 (0~100.0)
+            similarity = calculate_video_similarity(hashes1, hashes2)
+            
+            if similarity >= threshold:
+                current_group[path2] = similarity
+                processed.add(path2)
+        
+        if len(current_group) > 1:
+            processed.add(path1)
+            # 유사도 높은 순 정렬
+            sorted_group = sorted(current_group.items(), key=lambda item: item[1], reverse=True)
+            groups.append(sorted_group)
+            
+    return groups
+
+def find_similar_videos_from_folder(folder_path, threshold):
+    """폴더 내 비디오들을 스캔하여 유사 그룹 반환"""
+    hashes = {}
+    # 비디오 확장자 목록 (소문자)
+    video_extensions = ('.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm', '.m4v')
+    
+    for root, dirs, files in os.walk(folder_path):
+        for filename in files:
+            if not filename.lower().endswith(video_extensions): continue
+            
+            full_path = os.path.join(root, filename)
+            try:
+                # 프레임 추출 및 해싱 (기본 10프레임)
+                vid_hashes = extract_video_fingerprint(full_path)
+                if vid_hashes:
+                    hashes[full_path] = vid_hashes
+            except Exception as e: 
+                print(f"❌ 비디오 해시 생성 오류: {full_path} → {e}")
+                
+    return group_video_hashes(hashes, threshold)
+
+def find_similar_videos_from_list(file_list, threshold):
+    """파일 리스트 내 비디오들을 스캔하여 유사 그룹 반환"""
+    hashes = {}
+    for full_path in file_list:
+        if not os.path.isfile(full_path): continue
+        try:
+            vid_hashes = extract_video_fingerprint(full_path)
+            if vid_hashes:
+                hashes[full_path] = vid_hashes
+        except Exception as e: 
+            print(f"❌ 비디오 해시 생성 오류: {full_path} → {e}")
+            
+    return group_video_hashes(hashes, threshold)
+
+
+# --- 문서 유사도 검사 로직 ---
+
+# 라이브러리 로드 시도 (없을 경우 에러 방지)
+try:
+    import PyPDF2
+    PDF_AVAILABLE = True
+except ImportError:
+    PDF_AVAILABLE = False
+    print("⚠️ PyPDF2가 설치되지 않아 PDF 검사가 제한됩니다.")
+
+try:
+    import docx
+    DOCX_AVAILABLE = True
+except ImportError:
+    DOCX_AVAILABLE = False
+    print("⚠️ python-docx가 설치되지 않아 DOCX 검사가 제한됩니다.")
+
+try:
+    import olefile
+    HWP_AVAILABLE = True
+except ImportError:
+    HWP_AVAILABLE = False
+    print("⚠️ olefile이 설치되지 않아 HWP 검사가 제한됩니다.")
+
+def get_hwp_text(filename):
+    """HWP 파일(5.0 버전 이상, OLE 포맷)에서 텍스트만 추출"""
+    if not HWP_AVAILABLE: return ""
+    
+    # 파일이 실제 OLE 포맷인지 먼저 확인 (HWPX나 손상된 파일 방지)
+    if not olefile.isOleFile(filename):
+        return "" 
+
+    text = ""
+    try:
+        f = olefile.OleFileIO(filename)
+        dirs = f.listdir()
+        
+        # [수정] IndexError 방지를 위해 길이를 체크하며 섹션 찾기
+        sections = []
+        for d in dirs:
+            # "BodyText" 폴더 안에 있는 파일만 대상 (길이가 2 이상이어야 함)
+            if d[0] == "BodyText" and len(d) > 1:
+                sections.append(d[1])
+        
+        sections.sort() # 섹션 순서대로 정렬 (Section0, Section1...)
+        
+        for section in sections:
+            # 스트림 경로 조합 (예: "BodyText/Section0")
+            bodytext = f.openstream(["BodyText", section]).read()
+            
+            # HWP 5.0 압축 해제 (zlib)
+            try:
+                # -15: 헤더 없는 Raw Deflate 시도 (대부분의 HWP)
+                unpacked_data = zlib.decompress(bodytext, -15)
+            except zlib.error:
+                try:
+                    # 실패 시 표준 zlib 시도
+                    unpacked_data = zlib.decompress(bodytext)
+                except:
+                    # 압축이 안 된 경우 (매우 드묾)
+                    unpacked_data = bodytext
+            
+            # UTF-16LE 디코딩
+            decoded_text = unpacked_data.decode('utf-16le', errors='ignore')
+            
+            # 텍스트 정제
+            text += decoded_text.replace('\r', '\n').replace('\x00', '') + "\n"
+            
+        f.close()
+    except Exception as e:
+        # 디버깅을 위해 에러 메시지 출력
+        print(f"❌ HWP 내부 구조 분석 실패 ({filename}): {e}")
+        return ""
+        
+    return text
+
+def extract_text_from_file(filepath, max_chars=100000):
+    """
+    파일 확장자에 따라 적절한 방식으로 텍스트를 추출합니다.
+    [수정 사항] SMI, SRT 등 자막 파일을 위해 UTF-16 및 Latin-1 폴백 추가
+    """
+    ext = os.path.splitext(filepath)[1].lower()
+    text = ""
+
+    # 1. PDF 파일 (PyPDF2 필요)
+    if ext == '.pdf' and PDF_AVAILABLE:
+        try:
+            with open(filepath, 'rb') as f:
+                reader = PyPDF2.PdfReader(f)
+                for i in range(min(5, len(reader.pages))):
+                    page_text = reader.pages[i].extract_text()
+                    if page_text: text += page_text
+            return text[:max_chars].strip()
+        except Exception as e:
+            print(f"PDF 읽기 실패: {e}")
+            return ""
+
+    # 2. Word 파일 (python-docx 필요)
+    elif ext == '.docx' and DOCX_AVAILABLE:
+        try:
+            doc = docx.Document(filepath)
+            for para in doc.paragraphs:
+                text += para.text + "\n"
+                if len(text) > max_chars: break
+            return text[:max_chars].strip()
+        except Exception as e:
+            print(f"DOCX 읽기 실패: {e}")
+            return ""
+    
+    # 3. HWP 파일 (olefile 필요)
+    elif ext == '.hwp':
+        try:
+            extracted = get_hwp_text(filepath)
+            if not extracted: pass 
+            return extracted[:max_chars].strip()
+        except Exception as e:
+            print(f"HWP 읽기 실패: {e}")
+            return ""
+        
+    # 4. 그 외 모든 파일 (자막 .smi, .srt 및 일반 텍스트)
+    else:
+        # 인코딩 시도 순서:
+        # 1. utf-8-sig : BOM이 있는 UTF-8 (윈도우 메모장 저장 시 흔함) 및 일반 UTF-8
+        # 2. cp949 : 한국어 윈도우 기본 인코딩 (대부분의 옛날 자막 파일)
+        # 3. utf-16 : 최신 윈도우 메모장 기본 저장 방식
+        # 4. latin-1 : 위 3개가 다 안 될 때, 깨지더라도 바이트를 문자로 강제 변환하여 읽음 (0% 방지)
+        
+        encodings = ['utf-8-sig', 'cp949', 'utf-16', 'latin-1']
+        
+        for enc in encodings:
+            try:
+                with open(filepath, 'r', encoding=enc) as f:
+                    text = f.read(max_chars)
+                # 읽기에 성공하면 반복문 탈출
+                if text: break
+            except (UnicodeDecodeError, UnicodeError):
+                continue # 다음 인코딩 시도
+            except Exception:
+                break # 권한 문제 등 치명적 오류 시 중단
+
+    return text.strip()
+
+def calculate_text_similarity(text1, text2):
+    """두 텍스트의 유사도를 0~100%로 반환 (SequenceMatcher 사용)"""
+    if not text1 or not text2:
+        return 0.0
+    
+    # difflib은 표준 라이브러리로, 텍스트 비교에 매우 강력합니다.
+    matcher = difflib.SequenceMatcher(None, text1, text2)
+    return matcher.ratio() * 100.0
+
+def find_similar_docs_from_folder(folder_path, threshold):
+    """폴더 내 문서들을 스캔하여 유사 그룹 반환"""
+    
+    # [복구 완료] 변수명을 원래대로 doc_extensions로 되돌렸습니다.
+    # 단, 분석을 원하시는 .smi, .hwp, .srt는 목록에 포함되어야 인식이 가능합니다.
+    doc_extensions = ('.txt', '.md', '.py', '.pdf', '.docx', '.hwp', '.smi', '.srt')
+    
+    docs = {}
+    
+    # 1. 텍스트 추출 단계
+    for root, dirs, files in os.walk(folder_path):
+        for filename in files:
+            # 설정한 확장자로 끝나는 파일만 골라냅니다.
+            if filename.lower().endswith(doc_extensions):
+                full_path = os.path.join(root, filename)
+                extracted_text = extract_text_from_file(full_path)
+                
+                # 내용이 너무 짧으면(10자 미만) 비교 제외
+                if len(extracted_text) > 10:
+                    docs[full_path] = extracted_text
+
+    # 2. 비교 및 그룹화 단계 (기존 로직 그대로 유지)
+    doc_paths = list(docs.keys())
+    groups = []
+    processed = set()
+    
+    for i in range(len(doc_paths)):
+        path1 = doc_paths[i]
+        if path1 in processed: continue
+        
+        current_group = {path1: 100.0}
+        text1 = docs[path1]
+        
+        for j in range(i + 1, len(doc_paths)):
+            path2 = doc_paths[j]
+            if path2 in processed: continue
+            
+            text2 = docs[path2]
+            similarity = calculate_text_similarity(text1, text2)
+            
+            if similarity >= threshold:
+                current_group[path2] = similarity
+                processed.add(path2)
+        
+        if len(current_group) > 1:
+            processed.add(path1)
+            sorted_group = sorted(current_group.items(), key=lambda item: item[1], reverse=True)
+            groups.append(sorted_group)
+            
+    return groups
+
+
+def find_similar_docs_from_list(file_list, threshold):
+    """파일 리스트 내 문서들을 스캔하여 유사 그룹 반환"""
+    docs = {}
+    
+    for full_path in file_list:
+        if not os.path.isfile(full_path):
+            continue
+        extracted_text = extract_text_from_file(full_path)
+        
+        if len(extracted_text) > 10:
+            docs[full_path] = extracted_text
+    
+    # 비교 및 그룹화 단계
+    doc_paths = list(docs.keys())
+    groups = []
+    processed = set()
+    
+    for i in range(len(doc_paths)):
+        path1 = doc_paths[i]
+        if path1 in processed:
+            continue
+        
+        current_group = {path1: 100.0}
+        text1 = docs[path1]
+        
+        for j in range(i + 1, len(doc_paths)):
+            path2 = doc_paths[j]
+            if path2 in processed:
+                continue
+            
+            text2 = docs[path2]
+            similarity = calculate_text_similarity(text1, text2)
+            
+            if similarity >= threshold:
+                current_group[path2] = similarity
+                processed.add(path2)
+        
+        if len(current_group) > 1:
+            processed.add(path1)
+            sorted_group = sorted(current_group.items(), key=lambda item: item[1], reverse=True)
+            groups.append(sorted_group)
+    
+    return groups
+
+
+# --- 통합 스캔 함수 (UnifiedScanPage) 로직 ---
+
+def unified_scan_folder(folder_path, image_threshold=10, video_threshold=60, doc_threshold=75, scan_img=True, scan_vid=True, scan_doc=True):
+    """
+    폴더를 스캔하여 선택된 유형(이미지, 비디오, 문서)의 유사도를 분석합니다.
+    
+    Parameters:
+    - folder_path: 스캔할 폴더 경로
+    - image_threshold: 이미지 임계값
+    - video_threshold: 비디오 임계값
+    - doc_threshold: 문서 임계값
+    - scan_img: 이미지 스캔 여부 (Boolean)
+    - scan_vid: 비디오 스캔 여부 (Boolean)
+    - scan_doc: 문서 스캔 여부 (Boolean)
+    """
+    results = {
+        'images': [],
+        'videos': [],
+        'documents': []
+    }
+    
+    # 1. 이미지 스캔 (선택 시에만 실행)
+    if scan_img:
+        try:
+            results['images'] = find_similar_images_from_folder(folder_path, image_threshold)
+        except Exception as e:
+            print(f"❌ 이미지 스캔 오류: {e}")
+    
+    # 2. 비디오 스캔 (선택 시에만 실행)
+    if scan_vid:
+        try:
+            results['videos'] = find_similar_videos_from_folder(folder_path, video_threshold)
+        except Exception as e:
+            print(f"❌ 비디오 스캔 오류: {e}")
+    
+    # 3. 문서 스캔 (선택 시에만 실행)
+    if scan_doc:
+        try:
+            results['documents'] = find_similar_docs_from_folder(folder_path, doc_threshold)
+        except Exception as e:
+            print(f"❌ 문서 스캔 오류: {e}")
+    
+    return results
